@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { addMember, deleteMember, signOut, toggleMemberStatus } from "./actions";
 
@@ -10,15 +11,23 @@ export default async function MembersPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (!user) {
+    redirect("/onboarding");
+  }
+
   const { data: membership } = await supabase
     .from("org_members")
     .select("org_id, display_name, alliance_rank, is_admin, orgs(name, state)")
-    .eq("user_id", user!.id)
+    .eq("user_id", user.id)
     .single();
 
-  const orgId = membership!.org_id;
-  const org = membership!.orgs as unknown as { name: string; state: string | null } | null;
-  const isAdmin = membership!.is_admin;
+  if (!membership) {
+    redirect("/onboarding");
+  }
+
+  const orgId = membership.org_id;
+  const org = membership.orgs as unknown as { name: string; state: string | null } | null;
+  const isAdmin = membership.is_admin;
 
   const [{ data: subAlliances }, { data: members }] = await Promise.all([
     supabase.from("sub_alliances").select("id, name").eq("org_id", orgId).order("name"),
@@ -45,7 +54,7 @@ export default async function MembersPage() {
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="text-slate-600">
-              {membership!.display_name} — {membership!.alliance_rank}
+              {membership.display_name} — {membership.alliance_rank}
             </span>
             <form action={signOut}>
               <button className="rounded-lg border border-slate-300 px-3 py-1.5 text-slate-600 transition hover:bg-slate-100">
