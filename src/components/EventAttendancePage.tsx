@@ -315,6 +315,13 @@ export default async function EventAttendancePage({
           )}
         </div>
 
+        {isAdmin && activeEvent && (
+          <div className="border-b border-slate-100 px-5 py-4">
+            <AttendanceImportClient orgId={orgId} eventId={activeEvent.id} eventType={eventType} />
+            <ScreenshotImportClient orgId={orgId} eventId={activeEvent.id} eventType={eventType} />
+          </div>
+        )}
+
         {!events?.length ? (
           <p className="px-5 pb-6 text-sm text-slate-400">
             No completed {label} event recorded yet.
@@ -342,13 +349,6 @@ export default async function EventAttendancePage({
               })}
             />
           )
-        )}
-
-        {isAdmin && activeEvent && (
-          <div className="border-t border-slate-100 px-5 py-4">
-            <AttendanceImportClient orgId={orgId} eventId={activeEvent.id} eventType={eventType} />
-            <ScreenshotImportClient orgId={orgId} eventId={activeEvent.id} eventType={eventType} />
-          </div>
         )}
       </div>
     </>
