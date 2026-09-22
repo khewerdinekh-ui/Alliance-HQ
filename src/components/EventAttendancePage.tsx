@@ -334,7 +334,7 @@ export default async function EventAttendancePage({
                   name: m.name,
                   legion: a?.legion ?? null,
                   lineupRole: (a?.lineup_role as "main" | "sub") ?? "main",
-                  signedUp: a?.signed_up ?? true,
+                  signedUp: a?.signed_up ?? false,
                   arrived: a?.status === "attended",
                   reason: a?.reason ?? "",
                   isPunished: punishedMemberIds.has(m.id),
