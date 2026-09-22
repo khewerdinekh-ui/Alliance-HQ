@@ -62,9 +62,8 @@ export default async function EventAttendancePage({
         .limit(20),
     ]);
 
-  const activeEvent = selectedEventId
-    ? events?.find((e) => e.id === selectedEventId)
-    : events?.[0];
+  const activeEvent =
+    (selectedEventId && events?.find((e) => e.id === selectedEventId)) || events?.[0];
 
   const { data: attendanceRows } = activeEvent
     ? await supabase
