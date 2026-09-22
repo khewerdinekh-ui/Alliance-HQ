@@ -4,6 +4,7 @@ import { requireMembership } from "@/lib/membership";
 import { createBearEvent, deleteEvent, updateBearTimes } from "@/app/(app)/events/actions";
 import BearResultsLeaderboard from "@/components/BearResultsLeaderboard";
 import BearResultsImportClient from "@/components/BearResultsImportClient";
+import BearResultsScreenshotImportClient from "@/components/BearResultsScreenshotImportClient";
 
 export default async function BearAttendancePage({ selectedEventId }: { selectedEventId?: string }) {
   const membership = await requireMembership();
@@ -218,6 +219,7 @@ export default async function BearAttendancePage({ selectedEventId }: { selected
         {isAdmin && activeEvent && (
           <div className="border-b border-slate-100 px-5 py-4">
             <BearResultsImportClient orgId={orgId} eventId={activeEvent.id} />
+            <BearResultsScreenshotImportClient orgId={orgId} eventId={activeEvent.id} />
           </div>
         )}
 
