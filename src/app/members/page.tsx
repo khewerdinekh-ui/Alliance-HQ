@@ -13,7 +13,7 @@ export default async function MembersPage() {
   const { data: membership } = await supabase
     .from("org_members")
     .select("org_id, display_name, alliance_rank, is_admin, orgs(name, state)")
-    .eq("profile_id", user!.id)
+    .eq("user_id", user!.id)
     .single();
 
   const orgId = membership!.org_id;

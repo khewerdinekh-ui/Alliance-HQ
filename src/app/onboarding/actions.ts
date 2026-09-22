@@ -13,6 +13,9 @@ export async function createOrg(_prevState: string | undefined, formData: FormDa
   if (!orgName || !state || !password || !chiefId || !displayName) {
     return "All fields are required.";
   }
+  if (password.length < 8) {
+    return "Alliance password must be at least 8 characters.";
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("create_org", {

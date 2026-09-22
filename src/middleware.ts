@@ -28,29 +28,23 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isAuthRoute = path.startsWith("/login") || path.startsWith("/signup");
   const isOnboardingRoute = path.startsWith("/onboarding");
 
+  // No session yet (first visit): only /onboarding is reachable — it creates
+  // the anonymous session itself once the user submits Join/Create.
   if (!user) {
-    if (!isAuthRoute) {
+    if (!isOnboardingRoute) {
       const url = request.nextUrl.clone();
-      url.pathname = "/login";
+      url.pathname = "/onboarding";
       return NextResponse.redirect(url);
     }
     return response;
   }
 
-  // Signed in past this point.
-  if (isAuthRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/members";
-    return NextResponse.redirect(url);
-  }
-
   const { count } = await supabase
     .from("org_members")
     .select("*", { count: "exact", head: true })
-    .eq("profile_id", user.id);
+    .eq("user_id", user.id);
 
   const hasOrg = (count ?? 0) > 0;
 
