@@ -140,6 +140,7 @@ export default function AttendanceGrid({
               <td className="px-4 py-3 align-top">
                 {isAdmin ? (
                   <select
+                    key={`legion-${r.memberId}-${r.legion ?? ""}`}
                     defaultValue={r.legion ?? ""}
                     onChange={(e) => save(r.memberId, { legion: e.target.value })}
                     className="rounded-full border border-slate-200 px-2 py-1 text-xs focus:border-teal-500 focus:outline-none"
@@ -158,6 +159,7 @@ export default function AttendanceGrid({
               <td className="px-4 py-3 align-top">
                 {isAdmin ? (
                   <select
+                    key={`lineup-${r.memberId}-${r.lineupRole}`}
                     defaultValue={r.lineupRole}
                     onChange={(e) =>
                       save(r.memberId, { lineupRole: e.target.value as "main" | "sub" })
@@ -175,6 +177,7 @@ export default function AttendanceGrid({
                 {isAdmin ? (
                   <label className="flex items-center gap-1.5 text-xs text-slate-600">
                     <input
+                      key={`signedup-${r.memberId}-${r.signedUp}`}
                       type="checkbox"
                       defaultChecked={r.signedUp}
                       onChange={(e) => save(r.memberId, { signedUp: e.target.checked })}
@@ -191,6 +194,7 @@ export default function AttendanceGrid({
               <td className="px-4 py-3 align-top">
                 {isAdmin ? (
                   <select
+                    key={`arrived-${r.memberId}-${r.arrived}`}
                     defaultValue={r.arrived ? "arrived" : "not_arrived"}
                     onChange={(e) => save(r.memberId, { arrived: e.target.value === "arrived" })}
                     className={`rounded-full border px-2 py-1 text-xs focus:outline-none ${
@@ -211,6 +215,7 @@ export default function AttendanceGrid({
               <td className="px-4 py-3 align-top">
                 {isAdmin ? (
                   <ReasonInput
+                    key={`reason-${r.memberId}-${r.reason}`}
                     initial={r.reason}
                     disabled={r.arrived}
                     onCommit={(value) => save(r.memberId, { reason: value })}
