@@ -33,6 +33,7 @@ export default function AttendanceGrid({
   isAdmin: boolean;
 }) {
   const showLegion = eventType !== "bear";
+  const showPunish = eventType !== "bear";
   const [search, setSearch] = useState("");
   const [legionFilter, setLegionFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -126,7 +127,7 @@ export default function AttendanceGrid({
             <tr key={r.memberId}>
               <td className="px-4 py-3 align-top">
                 <p className="font-medium text-slate-900">{r.name}</p>
-                {isAdmin && (
+                {showPunish && isAdmin && (
                   <button
                     disabled={r.isPunished}
                     onClick={() =>

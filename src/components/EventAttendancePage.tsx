@@ -140,7 +140,7 @@ export default async function EventAttendancePage({
         )}
       </div>
 
-      {isAdmin && doNotSignUp.length > 0 && mostRecentEvent && (
+      {eventType !== "bear" && isAdmin && doNotSignUp.length > 0 && mostRecentEvent && (
         <DoNotSignUpPanel
           orgId={orgId}
           eventType={eventType}
@@ -150,130 +150,132 @@ export default async function EventAttendancePage({
         />
       )}
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50/60">
-        <div className="flex items-start justify-between px-5 py-4">
-          <div>
-            <h3 className="text-sm font-semibold text-amber-900">
-              Active {label} punishments
-            </h3>
-            <p className="mt-0.5 text-xs text-amber-700">
-              Players stay here until the chosen number of completed {label} events has passed.
-            </p>
-          </div>
-          <span className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-700">
-            {punishments?.length ?? 0}
-          </span>
-        </div>
-
-        <div className="px-5 pb-5">
-          {punishments?.length ? (
-            <div className="space-y-2">
-              {punishments.map((p) => {
-                const remaining = Math.max(0, p.required_events - eventsCountSince(p.created_at));
-                const memberName = (p.members as unknown as { name: string } | null)?.name ?? "—";
-                return (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between rounded-xl border border-amber-100 bg-white px-4 py-3"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{memberName}</p>
-                      <p className="text-xs text-slate-500">
-                        {remaining} event{remaining === 1 ? "" : "s"} remaining
-                        {p.reason ? ` — ${p.reason}` : ""}
-                      </p>
-                    </div>
-                    {isAdmin && (
-                      <form action={resolvePunishment}>
-                        <input type="hidden" name="id" value={p.id} />
-                        <input type="hidden" name="eventType" value={eventType} />
-                        <button className="rounded-full border border-amber-200 px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-50">
-                          Resolve
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                );
-              })}
+      {eventType !== "bear" && (
+        <div className="mt-6 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50/60">
+          <div className="flex items-start justify-between px-5 py-4">
+            <div>
+              <h3 className="text-sm font-semibold text-amber-900">
+                Active {label} punishments
+              </h3>
+              <p className="mt-0.5 text-xs text-amber-700">
+                Players stay here until the chosen number of completed {label} events has passed.
+              </p>
             </div>
-          ) : (
-            <p className="text-sm text-amber-700">No active {label} punishments.</p>
-          )}
+            <span className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-700">
+              {punishments?.length ?? 0}
+            </span>
+          </div>
 
-          {isAdmin && (
-            <details className="mt-3">
-              <summary className="cursor-pointer text-xs font-medium text-amber-800 hover:underline">
-                + Add punishment manually
-              </summary>
-              <form action={addPunishment} className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5">
-                <input type="hidden" name="orgId" value={orgId} />
-                <input type="hidden" name="eventType" value={eventType} />
-                <select
-                  name="memberId"
-                  required
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm sm:col-span-2"
-                  defaultValue=""
-                >
-                  <option value="" disabled>
-                    Select member
-                  </option>
-                  {members?.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  name="requiredEvents"
-                  type="number"
-                  min={1}
-                  defaultValue={1}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                  placeholder="Events"
-                />
-                <input
-                  name="reason"
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                  placeholder="Reason (optional)"
-                />
-                <button
-                  type="submit"
-                  className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-amber-700"
-                >
-                  Add
-                </button>
-              </form>
-            </details>
-          )}
-
-          {resolvedPunishments && resolvedPunishments.length > 0 && (
-            <details className="mt-3">
-              <summary className="cursor-pointer text-xs font-medium text-amber-800 hover:underline">
-                Punishment history ({resolvedPunishments.length})
-              </summary>
-              <div className="mt-2 space-y-1.5">
-                {resolvedPunishments.map((p) => {
+          <div className="px-5 pb-5">
+            {punishments?.length ? (
+              <div className="space-y-2">
+                {punishments.map((p) => {
+                  const remaining = Math.max(0, p.required_events - eventsCountSince(p.created_at));
                   const memberName = (p.members as unknown as { name: string } | null)?.name ?? "—";
                   return (
                     <div
                       key={p.id}
-                      className="rounded-lg border border-amber-100 bg-white px-3 py-2 text-xs text-slate-600"
+                      className="flex items-center justify-between rounded-xl border border-amber-100 bg-white px-4 py-3"
                     >
-                      <span className="font-medium text-slate-900">{memberName}</span> — applied{" "}
-                      {new Date(p.created_at).toLocaleDateString()},{" "}
-                      {p.required_events} event{p.required_events === 1 ? "" : "s"}
-                      {p.resolved_at
-                        ? `, resolved ${new Date(p.resolved_at).toLocaleDateString()}`
-                        : ""}
-                      {p.reason ? ` — ${p.reason}` : ""}
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">{memberName}</p>
+                        <p className="text-xs text-slate-500">
+                          {remaining} event{remaining === 1 ? "" : "s"} remaining
+                          {p.reason ? ` — ${p.reason}` : ""}
+                        </p>
+                      </div>
+                      {isAdmin && (
+                        <form action={resolvePunishment}>
+                          <input type="hidden" name="id" value={p.id} />
+                          <input type="hidden" name="eventType" value={eventType} />
+                          <button className="rounded-full border border-amber-200 px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-50">
+                            Resolve
+                          </button>
+                        </form>
+                      )}
                     </div>
                   );
                 })}
               </div>
-            </details>
-          )}
+            ) : (
+              <p className="text-sm text-amber-700">No active {label} punishments.</p>
+            )}
+
+            {isAdmin && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs font-medium text-amber-800 hover:underline">
+                  + Add punishment manually
+                </summary>
+                <form action={addPunishment} className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5">
+                  <input type="hidden" name="orgId" value={orgId} />
+                  <input type="hidden" name="eventType" value={eventType} />
+                  <select
+                    name="memberId"
+                    required
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm sm:col-span-2"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>
+                      Select member
+                    </option>
+                    {members?.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    name="requiredEvents"
+                    type="number"
+                    min={1}
+                    defaultValue={1}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    placeholder="Events"
+                  />
+                  <input
+                    name="reason"
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    placeholder="Reason (optional)"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-amber-700"
+                  >
+                    Add
+                  </button>
+                </form>
+              </details>
+            )}
+
+            {resolvedPunishments && resolvedPunishments.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs font-medium text-amber-800 hover:underline">
+                  Punishment history ({resolvedPunishments.length})
+                </summary>
+                <div className="mt-2 space-y-1.5">
+                  {resolvedPunishments.map((p) => {
+                    const memberName = (p.members as unknown as { name: string } | null)?.name ?? "—";
+                    return (
+                      <div
+                        key={p.id}
+                        className="rounded-lg border border-amber-100 bg-white px-3 py-2 text-xs text-slate-600"
+                      >
+                        <span className="font-medium text-slate-900">{memberName}</span> — applied{" "}
+                        {new Date(p.created_at).toLocaleDateString()},{" "}
+                        {p.required_events} event{p.required_events === 1 ? "" : "s"}
+                        {p.resolved_at
+                          ? `, resolved ${new Date(p.resolved_at).toLocaleDateString()}`
+                          : ""}
+                        {p.reason ? ` — ${p.reason}` : ""}
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 px-5 py-4">
