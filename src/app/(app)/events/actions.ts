@@ -99,12 +99,91 @@ export async function addPunishment(formData: FormData) {
   revalidatePath(`/${eventType}`);
 }
 
+// Same as addPunishment but callable directly (for the confirmation modal).
+export async function createPunishment(input: {
+  orgId: string;
+  memberId: string;
+  eventType: EventType;
+  requiredEvents: number;
+  reason: string;
+}) {
+  const supabase = await createClient();
+  await supabase.from("punishments").insert({
+    org_id: input.orgId,
+    member_id: input.memberId,
+    event_type: input.eventType,
+    required_events: input.requiredEvents,
+    reason: input.reason.trim() || null,
+  });
+  revalidatePath(`/${input.eventType}`);
+}
+
 export async function resolvePunishment(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
   const eventType = String(formData.get("eventType") ?? "");
   if (!id) return;
 
-  await supabase.from("punishments").update({ resolved: true }).eq("id", id);
+  await supabase
+    .from("punishments")
+    .update({ resolved: true, resolved_at: new Date().toISOString() })
+    .eq("id", id);
   revalidatePath(`/${eventType}`);
+}
+
+export type AttendanceImportRow = {
+  nameOrChiefId: string;
+  signedUp?: boolean;
+  arrived?: boolean;
+  reason?: string;
+  legion?: string;
+  lineupRole?: "main" | "sub";
+};
+
+export async function bulkImportAttendance(
+  orgId: string,
+  eventId: string,
+  eventType: EventType,
+  rows: AttendanceImportRow[]
+) {
+  const supabase = await createClient();
+
+  const { data: members } = await supabase
+    .from("members")
+    .select("id, name, chief_id")
+    .eq("org_id", orgId);
+
+  const byChiefId = new Map((members ?? []).filter((m) => m.chief_id).map((m) => [m.chief_id!, m.id]));
+  const byName = new Map((members ?? []).map((m) => [m.name.toLowerCase(), m.id]));
+
+  const upserts = [];
+  let unmatched = 0;
+
+  for (const row of rows) {
+    const key = row.nameOrChiefId.trim();
+    const memberId = byChiefId.get(key) ?? byName.get(key.toLowerCase());
+    if (!memberId) {
+      unmatched += 1;
+      continue;
+    }
+    const arrived = row.arrived ?? false;
+    const reason = row.reason?.trim() ?? "";
+    upserts.push({
+      org_id: orgId,
+      event_id: eventId,
+      member_id: memberId,
+      signed_up: row.signedUp ?? true,
+      legion: row.legion || null,
+      lineup_role: row.lineupRole ?? "main",
+      reason: reason || null,
+      status: arrived ? "attended" : reason ? "excused" : "no_show",
+    });
+  }
+
+  if (upserts.length) {
+    await supabase.from("attendance").upsert(upserts, { onConflict: "event_id,member_id" });
+  }
+
+  revalidatePath(`/${eventType}`);
+  return { imported: upserts.length, unmatched };
 }

@@ -9,6 +9,8 @@ import {
 } from "@/app/(app)/events/actions";
 import EventDatePicker from "@/components/EventDatePicker";
 import AttendanceGrid from "@/components/AttendanceGrid";
+import DoNotSignUpPanel from "@/components/DoNotSignUpPanel";
+import AttendanceImportClient from "@/components/AttendanceImportClient";
 
 const LABELS: Record<EventType, string> = {
   foundry: "Foundry",
@@ -29,26 +31,35 @@ export default async function EventAttendancePage({
   const isAdmin = membership.isAdmin;
   const label = LABELS[eventType];
 
-  const [{ data: events }, { data: members }, { data: punishments }] = await Promise.all([
-    supabase
-      .from("events")
-      .select("id, event_date")
-      .eq("org_id", orgId)
-      .eq("event_type", eventType)
-      .order("event_date", { ascending: false }),
-    supabase
-      .from("members")
-      .select("id, name")
-      .eq("org_id", orgId)
-      .eq("status", "current")
-      .order("name"),
-    supabase
-      .from("punishments")
-      .select("id, member_id, required_events, reason, created_at, members(name)")
-      .eq("org_id", orgId)
-      .eq("event_type", eventType)
-      .eq("resolved", false),
-  ]);
+  const [{ data: events }, { data: members }, { data: punishments }, { data: resolvedPunishments }] =
+    await Promise.all([
+      supabase
+        .from("events")
+        .select("id, event_date")
+        .eq("org_id", orgId)
+        .eq("event_type", eventType)
+        .order("event_date", { ascending: false }),
+      supabase
+        .from("members")
+        .select("id, name")
+        .eq("org_id", orgId)
+        .eq("status", "current")
+        .order("name"),
+      supabase
+        .from("punishments")
+        .select("id, member_id, required_events, reason, created_at, members(name)")
+        .eq("org_id", orgId)
+        .eq("event_type", eventType)
+        .eq("resolved", false),
+      supabase
+        .from("punishments")
+        .select("id, required_events, reason, created_at, resolved_at, members(name)")
+        .eq("org_id", orgId)
+        .eq("event_type", eventType)
+        .eq("resolved", true)
+        .order("resolved_at", { ascending: false })
+        .limit(20),
+    ]);
 
   const activeEvent = selectedEventId
     ? events?.find((e) => e.id === selectedEventId)
@@ -129,43 +140,13 @@ export default async function EventAttendancePage({
       </div>
 
       {isAdmin && doNotSignUp.length > 0 && mostRecentEvent && (
-        <div className="mt-6 overflow-hidden rounded-2xl border border-red-100 bg-red-50/60">
-          <div className="flex items-start justify-between px-5 py-4">
-            <div>
-              <h3 className="text-sm font-semibold text-red-900">Don&apos;t sign up next time</h3>
-              <p className="mt-0.5 text-xs text-red-700">
-                No reason given after missing {label} on {mostRecentEvent.event_date}. This list
-                clears after the next {label} is completed.
-              </p>
-            </div>
-            <span className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-red-100 px-1.5 text-xs font-semibold text-red-700">
-              {doNotSignUp.length}
-            </span>
-          </div>
-          <div className="space-y-2 px-5 pb-5">
-            {doNotSignUp.map((m) => (
-              <div
-                key={m.memberId}
-                className="flex items-center justify-between rounded-xl border border-red-100 bg-white px-4 py-3"
-              >
-                <div>
-                  <p className="text-sm font-medium text-slate-900">{m.name}</p>
-                  <p className="text-xs text-slate-400">No reason given</p>
-                </div>
-                <form action={addPunishment}>
-                  <input type="hidden" name="orgId" value={orgId} />
-                  <input type="hidden" name="eventType" value={eventType} />
-                  <input type="hidden" name="memberId" value={m.memberId} />
-                  <input type="hidden" name="requiredEvents" value="1" />
-                  <input type="hidden" name="reason" value="No reason given" />
-                  <button className="rounded-full bg-red-700 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-red-800">
-                    Punish
-                  </button>
-                </form>
-              </div>
-            ))}
-          </div>
-        </div>
+        <DoNotSignUpPanel
+          orgId={orgId}
+          eventType={eventType}
+          label={label}
+          eventDate={mostRecentEvent.event_date}
+          members={doNotSignUp}
+        />
       )}
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-amber-100 bg-amber-50/60">
@@ -263,6 +244,33 @@ export default async function EventAttendancePage({
               </form>
             </details>
           )}
+
+          {resolvedPunishments && resolvedPunishments.length > 0 && (
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs font-medium text-amber-800 hover:underline">
+                Punishment history ({resolvedPunishments.length})
+              </summary>
+              <div className="mt-2 space-y-1.5">
+                {resolvedPunishments.map((p) => {
+                  const memberName = (p.members as unknown as { name: string } | null)?.name ?? "—";
+                  return (
+                    <div
+                      key={p.id}
+                      className="rounded-lg border border-amber-100 bg-white px-3 py-2 text-xs text-slate-600"
+                    >
+                      <span className="font-medium text-slate-900">{memberName}</span> — applied{" "}
+                      {new Date(p.created_at).toLocaleDateString()},{" "}
+                      {p.required_events} event{p.required_events === 1 ? "" : "s"}
+                      {p.resolved_at
+                        ? `, resolved ${new Date(p.resolved_at).toLocaleDateString()}`
+                        : ""}
+                      {p.reason ? ` — ${p.reason}` : ""}
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          )}
         </div>
       </div>
 
@@ -332,6 +340,12 @@ export default async function EventAttendancePage({
               })}
             />
           )
+        )}
+
+        {isAdmin && activeEvent && (
+          <div className="border-t border-slate-100 px-5 py-4">
+            <AttendanceImportClient orgId={orgId} eventId={activeEvent.id} eventType={eventType} />
+          </div>
         )}
       </div>
     </>

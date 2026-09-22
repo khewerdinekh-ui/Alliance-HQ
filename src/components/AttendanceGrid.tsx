@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { addPunishment } from "@/app/(app)/events/actions";
 import { updateAttendanceRow, type EventType } from "@/app/(app)/events/actions";
+import PunishModal from "@/components/PunishModal";
 
 type Row = {
   memberId: string;
@@ -37,6 +37,9 @@ export default function AttendanceGrid({
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
   const [, startTransition] = useTransition();
+  const [punishTarget, setPunishTarget] = useState<{ memberId: string; name: string; reason: string } | null>(
+    null
+  );
 
   const signedUpCount = rows.filter((r) => r.signedUp).length;
   const arrivedCount = rows.filter((r) => r.arrived).length;
@@ -119,19 +122,19 @@ export default function AttendanceGrid({
               <td className="px-4 py-3 align-top">
                 <p className="font-medium text-slate-900">{r.name}</p>
                 {isAdmin && (
-                  <form action={addPunishment} className="mt-1">
-                    <input type="hidden" name="orgId" value={orgId} />
-                    <input type="hidden" name="eventType" value={eventType} />
-                    <input type="hidden" name="memberId" value={r.memberId} />
-                    <input type="hidden" name="requiredEvents" value="1" />
-                    <input type="hidden" name="reason" value={r.reason || "No reason given"} />
-                    <button
-                      disabled={r.isPunished}
-                      className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {r.isPunished ? "Punished" : "Punish"}
-                    </button>
-                  </form>
+                  <button
+                    disabled={r.isPunished}
+                    onClick={() =>
+                      setPunishTarget({
+                        memberId: r.memberId,
+                        name: r.name,
+                        reason: r.reason || "No reason given",
+                      })
+                    }
+                    className="mt-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {r.isPunished ? "Punished" : "Punish"}
+                  </button>
                 )}
               </td>
               <td className="px-4 py-3 align-top">
@@ -227,6 +230,18 @@ export default function AttendanceGrid({
           )}
         </tbody>
       </table>
+
+      {punishTarget && (
+        <PunishModal
+          orgId={orgId}
+          eventType={eventType}
+          memberId={punishTarget.memberId}
+          memberName={punishTarget.name}
+          defaultReason={punishTarget.reason}
+          onClose={() => setPunishTarget(null)}
+          onDone={() => setPunishTarget(null)}
+        />
+      )}
     </div>
   );
 }
