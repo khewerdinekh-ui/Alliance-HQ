@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 export async function addMember(formData: FormData) {
@@ -47,11 +46,4 @@ export async function toggleMemberStatus(formData: FormData) {
 
   await supabase.from("members").update({ status: nextStatus }).eq("id", id);
   revalidatePath("/members");
-}
-
-export async function signOut() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
-  revalidatePath("/", "layout");
-  redirect("/onboarding");
 }
