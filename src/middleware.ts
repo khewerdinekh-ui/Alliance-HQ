@@ -29,7 +29,8 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isOnboardingRoute = path.startsWith("/onboarding");
-  const isPublicRoute = isOnboardingRoute || path === "/contact" || path === "/subscription";
+  const isPublicRoute =
+    isOnboardingRoute || path === "/contact" || path === "/subscription" || path.startsWith("/owner");
 
   // No session yet (first visit): only public routes are reachable —
   // /onboarding creates the anonymous session itself once the user submits

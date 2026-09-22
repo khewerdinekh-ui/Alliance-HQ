@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
-import { OWNER_ORG_ID } from "@/lib/ownerOrg";
 import {
   addSubAlliance,
   deleteSubAlliance,
@@ -42,15 +40,6 @@ export default async function AdminPage() {
       <p className="mt-1 text-sm text-slate-500">
         Manage sub-alliances and member roles. There must always be at least one admin.
       </p>
-
-      {orgId === OWNER_ORG_ID && (
-        <Link
-          href="/admin/messages"
-          className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-medium text-teal-700 hover:bg-teal-100"
-        >
-          ✉️ Contact us messages
-        </Link>
-      )}
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h3 className="text-sm font-semibold text-slate-900">Alliance details</h3>

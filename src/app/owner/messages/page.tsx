@@ -1,13 +1,11 @@
 import { redirect } from "next/navigation";
-import { requireMembership } from "@/lib/membership";
+import { hasOwnerSession } from "@/lib/ownerAuth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { OWNER_ORG_ID } from "@/lib/ownerOrg";
-import { resolveContactMessage } from "../actions";
+import { resolveContactMessage, ownerLogout } from "./actions";
 
-export default async function ContactMessagesPage() {
-  const membership = await requireMembership();
-  if (!membership.isAdmin || membership.orgId !== OWNER_ORG_ID) {
-    redirect("/admin");
+export default async function OwnerMessagesPage() {
+  if (!(await hasOwnerSession())) {
+    redirect("/owner/login");
   }
 
   const supabase = createServiceClient();
@@ -20,37 +18,48 @@ export default async function ContactMessagesPage() {
   const resolved = messages?.filter((m) => m.resolved) ?? [];
 
   return (
-    <>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-700">Admin</h2>
-      <h1 className="mt-1 text-2xl font-semibold text-slate-900">Contact messages.</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        Submissions from the public "Contact us" form. Only visible to you.
-      </p>
+    <div className="min-h-screen bg-slate-100 px-4 py-10">
+      <div className="mx-auto max-w-2xl">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Site owner</p>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-900">Contact messages.</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Submissions from the public "Contact us" form. Only you can see this page.
+            </p>
+          </div>
+          <form action={ownerLogout}>
+            <button className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50">
+              Sign out
+            </button>
+          </form>
+        </div>
 
-      <div className="mt-6 space-y-3">
-        {unresolved.map((m) => (
-          <MessageCard key={m.id} message={m} />
-        ))}
-        {unresolved.length === 0 && (
-          <p className="rounded-2xl border border-slate-200 bg-white px-5 py-8 text-center text-sm text-slate-400 shadow-sm">
-            No new messages.
-          </p>
+        <div className="mt-6 space-y-3">
+          {unresolved.map((m) => (
+            <MessageCard key={m.id} message={m} />
+          ))}
+          {unresolved.length === 0 && (
+            <p className="rounded-2xl border border-slate-200 bg-white px-5 py-8 text-center text-sm text-slate-400 shadow-sm">
+              No new messages.
+            </p>
+          )}
+        </div>
+
+        {resolved.length > 0 && (
+          <details className="mt-6">
+            <summary className="cursor-pointer text-xs font-medium text-slate-500 hover:underline">
+              Handled ({resolved.length})
+            </summary>
+            <div className="mt-3 space-y-3">
+              {resolved.map((m) => (
+                <MessageCard key={m.id} message={m} />
+              ))}
+            </div>
+          </details>
         )}
       </div>
-
-      {resolved.length > 0 && (
-        <details className="mt-6">
-          <summary className="cursor-pointer text-xs font-medium text-slate-500 hover:underline">
-            Handled ({resolved.length})
-          </summary>
-          <div className="mt-3 space-y-3">
-            {resolved.map((m) => (
-              <MessageCard key={m.id} message={m} />
-            ))}
-          </div>
-        </details>
-      )}
-    </>
+    </div>
   );
 }
 
