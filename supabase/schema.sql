@@ -140,23 +140,26 @@ create policy "admins manage members roster in their org"
   with check (is_org_admin(org_id));
 
 -- Create a new org: caller becomes its R5 admin.
+-- Parameters are prefixed (p_*) so they never collide with column names —
+-- PL/pgSQL raises "ambiguous column reference" otherwise, e.g. inside
+-- ON CONFLICT ... DO UPDATE where the table's own columns are in scope.
 create or replace function create_org(
-  org_name text,
-  org_state text,
-  org_password text,
-  chief_id text,
-  display_name text
+  p_org_name text,
+  p_org_state text,
+  p_org_password text,
+  p_chief_id text,
+  p_display_name text
 )
 returns uuid as $$
 declare
   new_org_id uuid;
 begin
   insert into orgs (name, state, password_hash, created_by)
-  values (org_name, org_state, crypt(org_password, gen_salt('bf')), auth.uid())
+  values (p_org_name, p_org_state, crypt(p_org_password, gen_salt('bf')), auth.uid())
   returning id into new_org_id;
 
   insert into org_members (org_id, user_id, chief_id, display_name, alliance_rank, is_admin)
-  values (new_org_id, auth.uid(), chief_id, display_name, 'R5', true);
+  values (new_org_id, auth.uid(), p_chief_id, p_display_name, 'R5', true);
 
   return new_org_id;
 end;
@@ -164,32 +167,32 @@ $$ language plpgsql security definer;
 
 -- Join (or reclaim your seat in) an existing org by name + state + shared password.
 create or replace function join_org(
-  org_name text,
-  org_state text,
-  org_password text,
-  chief_id text,
-  display_name text
+  p_org_name text,
+  p_org_state text,
+  p_org_password text,
+  p_chief_id text,
+  p_display_name text
 )
 returns uuid as $$
 declare
   target_org orgs%rowtype;
 begin
-  select * into target_org from orgs where name = org_name;
+  select * into target_org from orgs where name = p_org_name;
 
   if target_org.id is null then
     raise exception 'No alliance found with that name';
   end if;
 
-  if coalesce(target_org.state, '') <> coalesce(org_state, '') then
+  if coalesce(target_org.state, '') <> coalesce(p_org_state, '') then
     raise exception 'Alliance name and state don''t match';
   end if;
 
-  if target_org.password_hash <> crypt(org_password, target_org.password_hash) then
+  if target_org.password_hash <> crypt(p_org_password, target_org.password_hash) then
     raise exception 'Incorrect alliance password';
   end if;
 
   insert into org_members (org_id, user_id, chief_id, display_name)
-  values (target_org.id, auth.uid(), chief_id, display_name)
+  values (target_org.id, auth.uid(), p_chief_id, p_display_name)
   on conflict (org_id, chief_id) do update
     set user_id = excluded.user_id, display_name = excluded.display_name;
 

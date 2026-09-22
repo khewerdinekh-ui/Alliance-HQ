@@ -19,11 +19,11 @@ export async function createOrg(_prevState: string | undefined, formData: FormDa
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("create_org", {
-    org_name: orgName,
-    org_state: state,
-    org_password: password,
-    chief_id: chiefId,
-    display_name: displayName,
+    p_org_name: orgName,
+    p_org_state: state,
+    p_org_password: password,
+    p_chief_id: chiefId,
+    p_display_name: displayName,
   });
 
   if (error) {
@@ -49,11 +49,11 @@ export async function joinOrg(_prevState: string | undefined, formData: FormData
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("join_org", {
-    org_name: orgName,
-    org_state: state,
-    org_password: password,
-    chief_id: chiefId,
-    display_name: displayName,
+    p_org_name: orgName,
+    p_org_state: state,
+    p_org_password: password,
+    p_chief_id: chiefId,
+    p_display_name: displayName,
   });
 
   if (error) {
