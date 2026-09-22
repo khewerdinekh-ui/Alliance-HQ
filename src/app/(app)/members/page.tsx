@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
 import { getTranslations } from "@/lib/i18n/getLocale";
+import { computeOverallPercents } from "@/lib/attendance";
 import StatCard from "@/components/StatCard";
-import { addMember, deleteMember, toggleMemberStatus } from "./actions";
+import MembersTable from "@/components/MembersTable";
+import { addMember } from "./actions";
 
 const RANKS = ["R1", "R2", "R3", "R4", "R5"];
 
@@ -13,17 +15,30 @@ export default async function MembersPage() {
   const orgId = membership.orgId;
   const isAdmin = membership.isAdmin;
 
-  const [{ data: subAlliances }, { data: members }] = await Promise.all([
+  const [{ data: subAlliances }, { data: members }, overallPercents] = await Promise.all([
     supabase.from("sub_alliances").select("id, name").eq("org_id", orgId).order("name"),
     supabase
       .from("members")
       .select("id, name, chief_id, power, level, alliance_rank, status, sub_alliances(name)")
       .eq("org_id", orgId)
       .order("name"),
+    computeOverallPercents(supabase, orgId),
   ]);
 
   const currentMembers = members?.filter((m) => m.status === "current") ?? [];
   const oldMembers = members?.filter((m) => m.status === "old") ?? [];
+
+  const tableRows = (members ?? []).map((m) => ({
+    id: m.id,
+    name: m.name,
+    chief_id: m.chief_id,
+    power: m.power,
+    level: m.level,
+    alliance_rank: m.alliance_rank,
+    status: m.status,
+    allianceName: (m.sub_alliances as unknown as { name: string } | null)?.name ?? "",
+    overallPct: overallPercents.get(m.id) ?? 0,
+  }));
 
   return (
     <>
@@ -46,7 +61,9 @@ export default async function MembersPage() {
 
       {isAdmin && (
         <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">{t("members.addMember")}</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900">{t("members.addMember")}</h2>
+          </div>
           <form action={addMember} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-6">
             <input type="hidden" name="orgId" value={orgId} />
             <input
@@ -105,65 +122,11 @@ export default async function MembersPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-            <tr>
-              <th className="px-4 py-3">{t("members.tableMember")}</th>
-              <th className="px-4 py-3">{t("members.tableAlliance")}</th>
-              <th className="px-4 py-3">{t("members.tableChiefId")}</th>
-              <th className="px-4 py-3">{t("members.tablePower")}</th>
-              <th className="px-4 py-3">{t("members.tableLevel")}</th>
-              <th className="px-4 py-3">{t("members.tableRank")}</th>
-              {isAdmin && <th className="px-4 py-3" />}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {currentMembers.map((m) => (
-              <tr key={m.id}>
-                <td className="px-4 py-3 font-medium text-slate-900">{m.name}</td>
-                <td className="px-4 py-3 text-slate-600">
-                  {(m.sub_alliances as unknown as { name: string } | null)?.name ?? "—"}
-                </td>
-                <td className="px-4 py-3 text-slate-600">{m.chief_id ?? "—"}</td>
-                <td className="px-4 py-3 text-slate-600">{m.power ?? "—"}</td>
-                <td className="px-4 py-3 text-slate-600">{m.level ?? "—"}</td>
-                <td className="px-4 py-3">
-                  <span className="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700">
-                    {m.alliance_rank}
-                  </span>
-                </td>
-                {isAdmin && (
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <form action={toggleMemberStatus}>
-                        <input type="hidden" name="id" value={m.id} />
-                        <input type="hidden" name="nextStatus" value="old" />
-                        <button className="text-xs text-slate-500 hover:underline">
-                          {t("members.markOld")}
-                        </button>
-                      </form>
-                      <form action={deleteMember}>
-                        <input type="hidden" name="id" value={m.id} />
-                        <button className="text-xs text-red-600 hover:underline">
-                          {t("members.delete")}
-                        </button>
-                      </form>
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {currentMembers.length === 0 && (
-              <tr>
-                <td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-center text-slate-400">
-                  {t("members.noMembers")}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <MembersTable
+        members={tableRows}
+        allianceNames={subAlliances?.map((a) => a.name) ?? []}
+        isAdmin={isAdmin}
+      />
     </>
   );
 }
