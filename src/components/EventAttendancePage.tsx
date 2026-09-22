@@ -68,7 +68,7 @@ export default async function EventAttendancePage({
   const { data: attendanceRows } = activeEvent
     ? await supabase
         .from("attendance")
-        .select("member_id, status, legion, lineup_role, signed_up, reason")
+        .select("member_id, status, legion, lineup_role, signed_up, reason, score")
         .eq("event_id", activeEvent.id)
     : {
         data: [] as {
@@ -78,6 +78,7 @@ export default async function EventAttendancePage({
           lineup_role: string;
           signed_up: boolean;
           reason: string | null;
+          score: number | null;
         }[],
       };
 
@@ -345,6 +346,7 @@ export default async function EventAttendancePage({
                   signedUp: a?.signed_up ?? false,
                   arrived: a?.status === "attended",
                   reason: a?.reason ?? "",
+                  score: a?.score ?? null,
                   isPunished: punishedMemberIds.has(m.id),
                 };
               })}

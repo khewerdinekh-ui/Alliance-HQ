@@ -2,9 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
 import { createBearEvent, deleteEvent, updateBearTimes } from "@/app/(app)/events/actions";
-import AttendanceGrid from "@/components/AttendanceGrid";
-import AttendanceImportClient from "@/components/AttendanceImportClient";
-import ScreenshotImportClient from "@/components/ScreenshotImportClient";
+import BearResultsLeaderboard from "@/components/BearResultsLeaderboard";
+import BearResultsImportClient from "@/components/BearResultsImportClient";
 
 export default async function BearAttendancePage({ selectedEventId }: { selectedEventId?: string }) {
   const membership = await requireMembership();
@@ -46,11 +45,15 @@ export default async function BearAttendancePage({ selectedEventId }: { selected
   const { data: attendanceRows } = activeEvent
     ? await supabase
         .from("attendance")
-        .select("member_id, status, reason")
+        .select("member_id, score")
         .eq("event_id", activeEvent.id)
-    : { data: [] as { member_id: string; status: string; reason: string | null }[] };
+        .not("score", "is", null)
+    : { data: [] as { member_id: string; score: number | null }[] };
 
-  const attendanceByMember = new Map(attendanceRows?.map((a) => [a.member_id, a]));
+  const memberNameById = new Map(members?.map((m) => [m.id, m.name]));
+  const results = (attendanceRows ?? [])
+    .filter((a) => memberNameById.has(a.member_id) && a.score != null)
+    .map((a) => ({ memberId: a.member_id, name: memberNameById.get(a.member_id)!, score: a.score! }));
 
   function slotLabel(slot: number | null) {
     if (!slot) return "Bear";
@@ -214,8 +217,7 @@ export default async function BearAttendancePage({ selectedEventId }: { selected
 
         {isAdmin && activeEvent && (
           <div className="border-b border-slate-100 px-5 py-4">
-            <AttendanceImportClient orgId={orgId} eventId={activeEvent.id} eventType="bear" />
-            <ScreenshotImportClient orgId={orgId} eventId={activeEvent.id} eventType="bear" />
+            <BearResultsImportClient orgId={orgId} eventId={activeEvent.id} />
           </div>
         )}
 
@@ -224,24 +226,12 @@ export default async function BearAttendancePage({ selectedEventId }: { selected
         ) : (
           activeEvent &&
           members && (
-            <AttendanceGrid
+            <BearResultsLeaderboard
               orgId={orgId}
               eventId={activeEvent.id}
-              eventType="bear"
               isAdmin={isAdmin}
-              rows={members.map((m) => {
-                const a = attendanceByMember.get(m.id);
-                return {
-                  memberId: m.id,
-                  name: m.name,
-                  legion: null,
-                  lineupRole: "main" as const,
-                  signedUp: true,
-                  arrived: a?.status === "attended",
-                  reason: a?.reason ?? "",
-                  isPunished: false,
-                };
-              })}
+              members={members}
+              results={results}
             />
           )
         )}

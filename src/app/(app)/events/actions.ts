@@ -83,6 +83,82 @@ export async function createBearEvent(formData: FormData) {
   revalidatePath("/bear");
 }
 
+// Bear has no arrived/did-not-arrive grid — a saved damage score IS attendance.
+export async function addBearResult(formData: FormData) {
+  const supabase = await createClient();
+  const orgId = String(formData.get("orgId") ?? "");
+  const eventId = String(formData.get("eventId") ?? "");
+  const memberId = String(formData.get("memberId") ?? "");
+  const score = Number(formData.get("score") ?? "");
+  if (!orgId || !eventId || !memberId || !Number.isFinite(score) || score < 0) return;
+
+  await supabase.from("attendance").upsert(
+    {
+      org_id: orgId,
+      event_id: eventId,
+      member_id: memberId,
+      status: "attended",
+      signed_up: true,
+      score,
+    },
+    { onConflict: "event_id,member_id" }
+  );
+
+  revalidatePath("/bear");
+}
+
+export async function removeBearResult(formData: FormData) {
+  const supabase = await createClient();
+  const eventId = String(formData.get("eventId") ?? "");
+  const memberId = String(formData.get("memberId") ?? "");
+  if (!eventId || !memberId) return;
+
+  await supabase.from("attendance").delete().eq("event_id", eventId).eq("member_id", memberId);
+
+  revalidatePath("/bear");
+}
+
+export type BearResultImportRow = { nameOrChiefId: string; score: number };
+
+export async function bulkImportBearResults(orgId: string, eventId: string, rows: BearResultImportRow[]) {
+  const supabase = await createClient();
+
+  const { data: members } = await supabase
+    .from("members")
+    .select("id, name, chief_id")
+    .eq("org_id", orgId);
+
+  const byChiefId = new Map((members ?? []).filter((m) => m.chief_id).map((m) => [m.chief_id!, m.id]));
+  const byName = new Map((members ?? []).map((m) => [m.name.toLowerCase(), m.id]));
+
+  const upserts = [];
+  let unmatched = 0;
+
+  for (const row of rows) {
+    const key = row.nameOrChiefId.trim();
+    const memberId = byChiefId.get(key) ?? byName.get(key.toLowerCase());
+    if (!memberId || !Number.isFinite(row.score)) {
+      unmatched += 1;
+      continue;
+    }
+    upserts.push({
+      org_id: orgId,
+      event_id: eventId,
+      member_id: memberId,
+      status: "attended",
+      signed_up: true,
+      score: row.score,
+    });
+  }
+
+  if (upserts.length) {
+    await supabase.from("attendance").upsert(upserts, { onConflict: "event_id,member_id" });
+  }
+
+  revalidatePath("/bear");
+  return { imported: upserts.length, unmatched };
+}
+
 export type AttendanceFieldUpdate = {
   orgId: string;
   eventId: string;
@@ -93,6 +169,7 @@ export type AttendanceFieldUpdate = {
   signedUp?: boolean;
   arrived?: boolean;
   reason?: string;
+  score?: number | null;
 };
 
 // Upserts one attendance row, deriving `status` (attended/excused/no_show) from
@@ -102,7 +179,7 @@ export async function updateAttendanceRow(update: AttendanceFieldUpdate) {
 
   const { data: existing } = await supabase
     .from("attendance")
-    .select("legion, lineup_role, signed_up, status, reason")
+    .select("legion, lineup_role, signed_up, status, reason, score")
     .eq("event_id", update.eventId)
     .eq("member_id", update.memberId)
     .maybeSingle();
@@ -111,6 +188,7 @@ export async function updateAttendanceRow(update: AttendanceFieldUpdate) {
   const lineupRole = update.lineupRole ?? existing?.lineup_role ?? "main";
   const signedUp = update.signedUp ?? existing?.signed_up ?? true;
   const reason = update.reason ?? existing?.reason ?? "";
+  const score = update.score !== undefined ? update.score : (existing?.score ?? null);
   const arrived =
     update.arrived ?? (existing ? existing.status === "attended" : false);
 
@@ -125,6 +203,7 @@ export async function updateAttendanceRow(update: AttendanceFieldUpdate) {
       lineup_role: lineupRole,
       signed_up: signedUp,
       reason: reason || null,
+      score,
       status,
     },
     { onConflict: "event_id,member_id" }

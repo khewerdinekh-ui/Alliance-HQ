@@ -12,6 +12,7 @@ type Row = {
   signedUp: boolean;
   arrived: boolean;
   reason: string;
+  score: number | null;
   isPunished: boolean;
 };
 
@@ -124,6 +125,7 @@ export default function AttendanceGrid({
             )}
             <Th label="Arrival" k="arrived" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
             {showReason && <th className="px-4 py-2">Reason if absent</th>}
+            <th className="px-4 py-2">Score</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -242,12 +244,23 @@ export default function AttendanceGrid({
                   )}
                 </td>
               )}
+              <td className="px-4 py-3 align-top">
+                {isAdmin ? (
+                  <ScoreInput
+                    key={`score-${r.memberId}-${r.score ?? ""}`}
+                    initial={r.score}
+                    onCommit={(value) => save(r.memberId, { score: value })}
+                  />
+                ) : (
+                  r.score?.toLocaleString() ?? "—"
+                )}
+              </td>
             </tr>
           ))}
           {filtered.length === 0 && (
             <tr>
               <td
-                colSpan={2 + (showLegion ? 2 : 0) + (showSignedUp ? 1 : 0) + (showReason ? 1 : 0)}
+                colSpan={3 + (showLegion ? 2 : 0) + (showSignedUp ? 1 : 0) + (showReason ? 1 : 0)}
                 className="px-4 py-8 text-center text-slate-400"
               >
                 No members match.
@@ -278,6 +291,7 @@ type AttendanceFieldPatch = {
   signedUp: boolean;
   arrived: boolean;
   reason: string;
+  score: number | null;
 };
 
 function ReasonInput({
@@ -304,6 +318,30 @@ function ReasonInput({
       }}
       placeholder="Reason or excuse"
       className="w-40 rounded-lg border border-slate-200 px-2 py-1 text-xs focus:border-teal-500 focus:outline-none"
+    />
+  );
+}
+
+function ScoreInput({
+  initial,
+  onCommit,
+}: {
+  initial: number | null;
+  onCommit: (value: number | null) => void;
+}) {
+  const [value, setValue] = useState(initial != null ? String(initial) : "");
+
+  return (
+    <input
+      value={value}
+      onChange={(e) => setValue(e.target.value.replace(/[^\d]/g, ""))}
+      onBlur={() => {
+        const parsed = value.trim() ? Number(value) : null;
+        if (parsed !== initial) onCommit(parsed);
+      }}
+      placeholder="Score"
+      inputMode="numeric"
+      className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-xs focus:border-teal-500 focus:outline-none"
     />
   );
 }
