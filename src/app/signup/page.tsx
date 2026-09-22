@@ -11,7 +11,9 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
         <h1 className="text-xl font-semibold text-slate-900">Create your account</h1>
-        <p className="mt-1 text-sm text-slate-500">Join Alliance HQ.</p>
+        <p className="mt-1 text-sm text-slate-500">
+          Next you&apos;ll create or join your alliance.
+        </p>
 
         <form action={formAction} className="mt-6 space-y-4">
           <div>
@@ -23,19 +25,6 @@ export default function SignupPage() {
               name="chiefId"
               type="text"
               inputMode="numeric"
-              required
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="displayName" className="block text-sm font-medium text-slate-700">
-              Display name
-            </label>
-            <input
-              id="displayName"
-              name="displayName"
-              type="text"
               required
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
             />

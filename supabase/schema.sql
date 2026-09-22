@@ -1,41 +1,73 @@
--- Alliance HQ — schema (stage 1: auth by Chief ID + members roster)
+-- Alliance HQ — schema (stage 2: multi-tenant orgs, join-by-password)
 -- Run this in Supabase Dashboard -> SQL Editor -> New query -> Run
--- Safe to re-run: drops and recreates stage-1 objects (no real data exists yet)
+-- Safe to re-run: drops and recreates everything (no real data exists yet)
 
 drop trigger if exists on_auth_user_created on auth.users;
 drop function if exists handle_new_user();
 drop trigger if exists members_set_updated_at on members;
 drop table if exists members;
+drop table if exists sub_alliances;
+drop table if exists org_members;
+drop table if exists orgs;
 drop table if exists alliances;
 drop table if exists profiles;
 drop function if exists set_updated_at();
+drop function if exists create_org(text, text, text, text, text);
+drop function if exists join_org(text, text, text, text);
+drop function if exists is_org_member(uuid);
+drop function if exists is_org_admin(uuid);
 
--- Profiles: one row per authenticated user, linked to Supabase auth.
+create extension if not exists pgcrypto;
+
+-- Profiles: one row per authenticated user (the login account only).
 -- Members log in with their Chief ID; Supabase still needs an email internally,
--- so we generate one from the Chief ID (e.g. "78083388@chiefid.alliance-hq") and
--- never show it anywhere.
+-- so we generate one from the Chief ID and never show it anywhere.
 create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   chief_id text not null unique,
+  created_at timestamptz not null default now()
+);
+
+-- Orgs: one per "Command Centre" (what a member creates or joins).
+-- Gated by a shared password set by the R5 who creates it.
+create table orgs (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  state text,
+  password_hash text not null,
+  created_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+-- Membership of a profile within an org: their in-alliance identity/rank.
+create table org_members (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references orgs(id) on delete cascade,
+  profile_id uuid not null references profiles(id) on delete cascade,
+  chief_id text not null,
   display_name text not null,
   alliance_rank text not null default 'R1' check (alliance_rank in ('R1','R2','R3','R4','R5')),
   is_admin boolean not null default false,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (org_id, profile_id)
 );
 
--- Sub-alliances (e.g. ICX, ICY)
-create table alliances (
+-- Sub-alliances within an org (e.g. ICX, ICY)
+create table sub_alliances (
   id uuid primary key default gen_random_uuid(),
-  name text not null unique,
-  created_at timestamptz not null default now()
+  org_id uuid not null references orgs(id) on delete cascade,
+  name text not null,
+  created_at timestamptz not null default now(),
+  unique (org_id, name)
 );
 
--- Members roster
+-- Members roster (admin-managed entries, may or may not have a login account)
 create table members (
   id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references orgs(id) on delete cascade,
   name text not null,
   chief_id text,
-  alliance_id uuid references alliances(id) on delete set null,
+  sub_alliance_id uuid references sub_alliances(id) on delete set null,
   power bigint,
   level integer,
   alliance_rank text not null default 'R1' check (alliance_rank in ('R1','R2','R3','R4','R5')),
@@ -56,48 +88,12 @@ create trigger members_set_updated_at
   before update on members
   for each row execute function set_updated_at();
 
--- Row Level Security: any signed-in user can read; only admins can write
-alter table profiles enable row level security;
-alter table alliances enable row level security;
-alter table members enable row level security;
-
-create policy "profiles readable by signed-in users"
-  on profiles for select
-  using (auth.role() = 'authenticated');
-
-create policy "users can update own profile"
-  on profiles for update
-  using (auth.uid() = id);
-
-create policy "alliances readable by signed-in users"
-  on alliances for select
-  using (auth.role() = 'authenticated');
-
-create policy "admins manage alliances"
-  on alliances for all
-  using (exists (select 1 from profiles where id = auth.uid() and is_admin))
-  with check (exists (select 1 from profiles where id = auth.uid() and is_admin));
-
-create policy "members readable by signed-in users"
-  on members for select
-  using (auth.role() = 'authenticated');
-
-create policy "admins manage members"
-  on members for all
-  using (exists (select 1 from profiles where id = auth.uid() and is_admin))
-  with check (exists (select 1 from profiles where id = auth.uid() and is_admin));
-
--- Auto-create a profile row whenever a new user signs up.
--- chief_id and display_name are passed in via signUp's options.data.
+-- Auto-create a profile row whenever a new auth user signs up.
 create or replace function handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, chief_id, display_name)
-  values (
-    new.id,
-    new.raw_user_meta_data->>'chief_id',
-    coalesce(new.raw_user_meta_data->>'display_name', new.raw_user_meta_data->>'chief_id')
-  );
+  insert into public.profiles (id, chief_id)
+  values (new.id, new.raw_user_meta_data->>'chief_id');
   return new;
 end;
 $$ language plpgsql security definer;
@@ -106,6 +102,115 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function handle_new_user();
 
--- Seed the known sub-alliances
-insert into alliances (name) values ('ICX'), ('ICY')
-on conflict (name) do nothing;
+-- Helpers used by RLS policies
+create or replace function is_org_member(target_org_id uuid)
+returns boolean as $$
+  select exists (
+    select 1 from org_members
+    where org_id = target_org_id and profile_id = auth.uid()
+  );
+$$ language sql security definer stable;
+
+create or replace function is_org_admin(target_org_id uuid)
+returns boolean as $$
+  select exists (
+    select 1 from org_members
+    where org_id = target_org_id and profile_id = auth.uid() and is_admin
+  );
+$$ language sql security definer stable;
+
+alter table profiles enable row level security;
+alter table orgs enable row level security;
+alter table org_members enable row level security;
+alter table sub_alliances enable row level security;
+alter table members enable row level security;
+
+create policy "users read own profile"
+  on profiles for select
+  using (auth.uid() = id);
+
+-- orgs.name/password_hash must NOT be readable by anyone except via the
+-- create_org/join_org functions below (security definer, bypasses RLS).
+create policy "org members can read their org"
+  on orgs for select
+  using (is_org_member(id));
+
+create policy "org members can read membership rows in their org"
+  on org_members for select
+  using (is_org_member(org_id));
+
+create policy "admins manage org_members in their org"
+  on org_members for all
+  using (is_org_admin(org_id))
+  with check (is_org_admin(org_id));
+
+create policy "org members can read sub_alliances in their org"
+  on sub_alliances for select
+  using (is_org_member(org_id));
+
+create policy "admins manage sub_alliances in their org"
+  on sub_alliances for all
+  using (is_org_admin(org_id))
+  with check (is_org_admin(org_id));
+
+create policy "org members can read members roster in their org"
+  on members for select
+  using (is_org_member(org_id));
+
+create policy "admins manage members roster in their org"
+  on members for all
+  using (is_org_admin(org_id))
+  with check (is_org_admin(org_id));
+
+-- Create a new org: caller becomes its R5 admin.
+create or replace function create_org(
+  org_name text,
+  org_state text,
+  org_password text,
+  chief_id text,
+  display_name text
+)
+returns uuid as $$
+declare
+  new_org_id uuid;
+begin
+  insert into orgs (name, state, password_hash, created_by)
+  values (org_name, org_state, crypt(org_password, gen_salt('bf')), auth.uid())
+  returning id into new_org_id;
+
+  insert into org_members (org_id, profile_id, chief_id, display_name, alliance_rank, is_admin)
+  values (new_org_id, auth.uid(), chief_id, display_name, 'R5', true);
+
+  return new_org_id;
+end;
+$$ language plpgsql security definer;
+
+-- Join an existing org by name + shared password.
+create or replace function join_org(
+  org_name text,
+  org_password text,
+  chief_id text,
+  display_name text
+)
+returns uuid as $$
+declare
+  target_org orgs%rowtype;
+begin
+  select * into target_org from orgs where name = org_name;
+
+  if target_org.id is null then
+    raise exception 'No alliance found with that name';
+  end if;
+
+  if target_org.password_hash <> crypt(org_password, target_org.password_hash) then
+    raise exception 'Incorrect alliance password';
+  end if;
+
+  insert into org_members (org_id, profile_id, chief_id, display_name)
+  values (target_org.id, auth.uid(), chief_id, display_name)
+  on conflict (org_id, profile_id) do update
+    set chief_id = excluded.chief_id, display_name = excluded.display_name;
+
+  return target_org.id;
+end;
+$$ language plpgsql security definer;

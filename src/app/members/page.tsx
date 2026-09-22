@@ -10,20 +10,25 @@ export default async function MembersPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: alliances }, { data: members }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("display_name, chief_id, alliance_rank, is_admin")
-      .eq("id", user!.id)
-      .single(),
-    supabase.from("alliances").select("id, name").order("name"),
+  const { data: membership } = await supabase
+    .from("org_members")
+    .select("org_id, display_name, alliance_rank, is_admin, orgs(name, state)")
+    .eq("profile_id", user!.id)
+    .single();
+
+  const orgId = membership!.org_id;
+  const org = membership!.orgs as unknown as { name: string; state: string | null } | null;
+  const isAdmin = membership!.is_admin;
+
+  const [{ data: subAlliances }, { data: members }] = await Promise.all([
+    supabase.from("sub_alliances").select("id, name").eq("org_id", orgId).order("name"),
     supabase
       .from("members")
-      .select("id, name, chief_id, power, level, alliance_rank, status, alliances(name)")
+      .select("id, name, chief_id, power, level, alliance_rank, status, sub_alliances(name)")
+      .eq("org_id", orgId)
       .order("name"),
   ]);
 
-  const isAdmin = profile?.is_admin ?? false;
   const currentMembers = members?.filter((m) => m.status === "current") ?? [];
   const oldMembers = members?.filter((m) => m.status === "old") ?? [];
 
@@ -32,12 +37,15 @@ export default async function MembersPage() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">Alliance HQ</h1>
+            <h1 className="text-lg font-semibold text-slate-900">
+              {org?.name ?? "Alliance HQ"}
+              {org?.state ? ` · STATE ${org.state}` : ""}
+            </h1>
             <p className="text-xs text-slate-500">Command Centre</p>
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="text-slate-600">
-              {profile?.display_name} — {profile?.alliance_rank}
+              {membership!.display_name} — {membership!.alliance_rank}
             </span>
             <form action={signOut}>
               <button className="rounded-lg border border-slate-300 px-3 py-1.5 text-slate-600 transition hover:bg-slate-100">
@@ -53,13 +61,14 @@ export default async function MembersPage() {
           <StatCard label="Total members" value={members?.length ?? 0} />
           <StatCard label="Current" value={currentMembers.length} />
           <StatCard label="Old members" value={oldMembers.length} />
-          <StatCard label="Alliances" value={alliances?.length ?? 0} />
+          <StatCard label="Alliances" value={subAlliances?.length ?? 0} />
         </div>
 
         {isAdmin && (
           <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Add member</h2>
             <form action={addMember} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-6">
+              <input type="hidden" name="orgId" value={orgId} />
               <input
                 name="name"
                 placeholder="Name"
@@ -72,12 +81,12 @@ export default async function MembersPage() {
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
               <select
-                name="allianceId"
+                name="subAllianceId"
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 defaultValue=""
               >
                 <option value="">No alliance</option>
-                {alliances?.map((a) => (
+                {subAlliances?.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.name}
                   </option>
@@ -134,7 +143,7 @@ export default async function MembersPage() {
                 <tr key={m.id}>
                   <td className="px-4 py-3 font-medium text-slate-900">{m.name}</td>
                   <td className="px-4 py-3 text-slate-600">
-                    {(m.alliances as unknown as { name: string } | null)?.name ?? "—"}
+                    {(m.sub_alliances as unknown as { name: string } | null)?.name ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{m.chief_id ?? "—"}</td>
                   <td className="px-4 py-3 text-slate-600">{m.power ?? "—"}</td>

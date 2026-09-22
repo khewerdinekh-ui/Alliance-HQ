@@ -27,17 +27,40 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthRoute =
-    request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/signup");
+  const path = request.nextUrl.pathname;
+  const isAuthRoute = path.startsWith("/login") || path.startsWith("/signup");
+  const isOnboardingRoute = path.startsWith("/onboarding");
 
-  if (!user && !isAuthRoute) {
+  if (!user) {
+    if (!isAuthRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+    return response;
+  }
+
+  // Signed in past this point.
+  if (isAuthRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/members";
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute) {
+  const { count } = await supabase
+    .from("org_members")
+    .select("*", { count: "exact", head: true })
+    .eq("profile_id", user.id);
+
+  const hasOrg = (count ?? 0) > 0;
+
+  if (!hasOrg && !isOnboardingRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/onboarding";
+    return NextResponse.redirect(url);
+  }
+
+  if (hasOrg && isOnboardingRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/members";
     return NextResponse.redirect(url);
