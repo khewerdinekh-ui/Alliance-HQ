@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { requireMembership } from "@/lib/membership";
+import { OWNER_ORG_ID } from "@/lib/ownerOrg";
 
 async function assertAdmin() {
   const membership = await requireMembership();
@@ -90,4 +92,30 @@ export async function deleteSubAlliance(formData: FormData) {
 
   await supabase.from("sub_alliances").delete().eq("id", id);
   revalidatePath("/admin");
+}
+
+export async function updateOrgDetails(formData: FormData) {
+  const membership = await assertAdmin();
+  const supabase = await createClient();
+  const name = String(formData.get("orgName") ?? "").trim();
+  const state = String(formData.get("orgState") ?? "").trim();
+  if (!name || !state) return;
+
+  await supabase.from("orgs").update({ name, state }).eq("id", membership.orgId);
+  revalidatePath("/admin");
+}
+
+// Contact messages have no select/update RLS policy, so this reads through
+// the service-role key — gated to the owner org only, not "any admin",
+// because the site is self-service and any alliance can have an admin.
+export async function resolveContactMessage(formData: FormData) {
+  const membership = await assertAdmin();
+  if (membership.orgId !== OWNER_ORG_ID) throw new Error("Forbidden");
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = createServiceClient();
+  await supabase.from("contact_messages").update({ resolved: true }).eq("id", id);
+  revalidatePath("/admin/messages");
 }

@@ -1,12 +1,15 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
+import { OWNER_ORG_ID } from "@/lib/ownerOrg";
 import {
   addSubAlliance,
   deleteSubAlliance,
   removeOrgMember,
   setMemberAdmin,
   updateMemberRank,
+  updateOrgDetails,
 } from "./actions";
 
 const RANKS = ["R1", "R2", "R3", "R4", "R5"];
@@ -20,13 +23,14 @@ export default async function AdminPage() {
   const supabase = await createClient();
   const orgId = membership.orgId;
 
-  const [{ data: orgMembers }, { data: subAlliances }] = await Promise.all([
+  const [{ data: orgMembers }, { data: subAlliances }, { data: org }] = await Promise.all([
     supabase
       .from("org_members")
       .select("id, chief_id, display_name, alliance_rank, is_admin")
       .eq("org_id", orgId)
       .order("display_name"),
     supabase.from("sub_alliances").select("id, name").eq("org_id", orgId).order("name"),
+    supabase.from("orgs").select("name, state").eq("id", orgId).single(),
   ]);
 
   const adminCount = orgMembers?.filter((m) => m.is_admin).length ?? 0;
@@ -38,6 +42,45 @@ export default async function AdminPage() {
       <p className="mt-1 text-sm text-slate-500">
         Manage sub-alliances and member roles. There must always be at least one admin.
       </p>
+
+      {orgId === OWNER_ORG_ID && (
+        <Link
+          href="/admin/messages"
+          className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-medium text-teal-700 hover:bg-teal-100"
+        >
+          ✉️ Contact us messages
+        </Link>
+      )}
+
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 className="text-sm font-semibold text-slate-900">Alliance details</h3>
+        <form action={updateOrgDetails} className="mt-3 flex flex-wrap items-end gap-2">
+          <label className="text-xs font-medium text-slate-500">
+            Alliance name
+            <input
+              name="orgName"
+              defaultValue={org?.name ?? ""}
+              required
+              className="mt-1 block rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="text-xs font-medium text-slate-500">
+            State
+            <input
+              name="orgState"
+              defaultValue={org?.state ?? ""}
+              required
+              className="mt-1 block w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-teal-700"
+          >
+            Save
+          </button>
+        </form>
+      </div>
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h3 className="text-sm font-semibold text-slate-900">Sub-alliances</h3>
