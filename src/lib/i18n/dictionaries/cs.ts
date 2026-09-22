@@ -1,0 +1,60 @@
+import type en from "./en";
+
+const cs: typeof en = {
+  "nav.members": "Členové",
+  "nav.percentages": "Procenta",
+  "nav.foundry": "Slévárna",
+  "nav.canyon": "Kaňon",
+  "nav.bear": "Medvěd",
+  "nav.import": "Import",
+  "nav.admin": "Administrace",
+  "nav.subscription": "Předplatné",
+  "nav.contact": "Kontaktujte nás",
+
+  "common.commandCentre": "Velitelské centrum",
+  "common.signOut": "Odhlásit se",
+
+  "onboarding.title": "Alliance HQ",
+  "onboarding.subtitle": "Připojte se ke své alianci nebo založte novou.",
+  "onboarding.joinTab": "Připojit se k alianci",
+  "onboarding.createTab": "Vytvořit alianci",
+  "onboarding.playerName": "Jméno hráče",
+  "onboarding.playerNamePlaceholder": "Vaše jméno ve hře",
+  "onboarding.chiefId": "ID náčelníka",
+  "onboarding.chiefIdPlaceholder": "Vaše číselné ID náčelníka",
+  "onboarding.allianceName": "Název aliance",
+  "onboarding.allianceNamePlaceholder": "např. ICX",
+  "onboarding.state": "Stát",
+  "onboarding.statePlaceholder": "např. 686",
+  "onboarding.alliancePassword": "Heslo aliance",
+  "onboarding.joinPasswordPlaceholder": "Zadejte heslo od svého R5",
+  "onboarding.createPasswordPlaceholder": "Zvolte alespoň 8 znaků",
+  "onboarding.becomeR5":
+    "Stanete se R5 této aliance a kontrolu můžete později předat jinému členovi.",
+  "onboarding.enterButton": "Vstoupit do Alliance HQ",
+  "onboarding.entering": "Přihlašování…",
+  "onboarding.creating": "Vytváření…",
+
+  "members.eyebrow": "Členové aliance",
+  "members.title": "Vaše aliance na jeden pohled.",
+  "members.subtitle":
+    "Udržujte seznam členů a jejich hlavní údaje pohromadě. Pozice na akcích budou spravovány zvlášť.",
+  "members.addMember": "Přidat člena",
+  "members.totalMembers": "Členů celkem",
+  "members.current": "Současní",
+  "members.oldMembers": "Bývalí členové",
+  "members.alliances": "Aliance",
+  "members.tableMember": "Člen",
+  "members.tableAlliance": "Aliance",
+  "members.tableChiefId": "ID náčelníka",
+  "members.tablePower": "Síla",
+  "members.tableLevel": "Úroveň",
+  "members.tableRank": "Hodnost",
+  "members.noMembers": "Zatím žádní členové.",
+  "members.markOld": "Označit jako bývalého",
+  "members.delete": "Smazat",
+  "members.noAlliance": "Žádná aliance",
+  "members.namePlaceholder": "Jméno",
+};
+
+export default cs;

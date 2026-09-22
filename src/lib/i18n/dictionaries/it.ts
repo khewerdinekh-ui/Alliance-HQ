@@ -1,0 +1,60 @@
+import type en from "./en";
+
+const it: typeof en = {
+  "nav.members": "Membri",
+  "nav.percentages": "Percentuali",
+  "nav.foundry": "Fonderia",
+  "nav.canyon": "Canyon",
+  "nav.bear": "Orso",
+  "nav.import": "Importa",
+  "nav.admin": "Admin",
+  "nav.subscription": "Abbonamento",
+  "nav.contact": "Contattaci",
+
+  "common.commandCentre": "Centro di comando",
+  "common.signOut": "Esci",
+
+  "onboarding.title": "Alliance HQ",
+  "onboarding.subtitle": "Unisciti alla tua alleanza o creane una nuova.",
+  "onboarding.joinTab": "Unisciti all'alleanza",
+  "onboarding.createTab": "Crea alleanza",
+  "onboarding.playerName": "Nome giocatore",
+  "onboarding.playerNamePlaceholder": "Il tuo nome in gioco",
+  "onboarding.chiefId": "ID capo",
+  "onboarding.chiefIdPlaceholder": "Il tuo ID capo numerico",
+  "onboarding.allianceName": "Nome alleanza",
+  "onboarding.allianceNamePlaceholder": "es. ICX",
+  "onboarding.state": "Stato",
+  "onboarding.statePlaceholder": "es. 686",
+  "onboarding.alliancePassword": "Password dell'alleanza",
+  "onboarding.joinPasswordPlaceholder": "Inserisci la password del tuo R5",
+  "onboarding.createPasswordPlaceholder": "Scegli almeno 8 caratteri",
+  "onboarding.becomeR5":
+    "Diventerai l'R5 di questa alleanza e potrai trasferire il controllo a un altro membro in seguito.",
+  "onboarding.enterButton": "Entra in Alliance HQ",
+  "onboarding.entering": "Accesso…",
+  "onboarding.creating": "Creazione…",
+
+  "members.eyebrow": "Membri dell'alleanza",
+  "members.title": "La tua alleanza a colpo d'occhio.",
+  "members.subtitle":
+    "Tieni insieme l'elenco dei membri e i loro dati principali. Le posizioni per gli eventi verranno gestite separatamente.",
+  "members.addMember": "Aggiungi membro",
+  "members.totalMembers": "Membri totali",
+  "members.current": "Attuali",
+  "members.oldMembers": "Membri vecchi",
+  "members.alliances": "Alleanze",
+  "members.tableMember": "Membro",
+  "members.tableAlliance": "Alleanza",
+  "members.tableChiefId": "ID capo",
+  "members.tablePower": "Potenza",
+  "members.tableLevel": "Livello",
+  "members.tableRank": "Grado",
+  "members.noMembers": "Ancora nessun membro.",
+  "members.markOld": "Segna come vecchio",
+  "members.delete": "Elimina",
+  "members.noAlliance": "Nessuna alleanza",
+  "members.namePlaceholder": "Nome",
+};
+
+export default it;

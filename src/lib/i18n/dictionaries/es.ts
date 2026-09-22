@@ -1,0 +1,60 @@
+import type en from "./en";
+
+const es: typeof en = {
+  "nav.members": "Miembros",
+  "nav.percentages": "Porcentajes",
+  "nav.foundry": "Fundición",
+  "nav.canyon": "Cañón",
+  "nav.bear": "Oso",
+  "nav.import": "Importar",
+  "nav.admin": "Administración",
+  "nav.subscription": "Suscripción",
+  "nav.contact": "Contáctanos",
+
+  "common.commandCentre": "Centro de mando",
+  "common.signOut": "Cerrar sesión",
+
+  "onboarding.title": "Alliance HQ",
+  "onboarding.subtitle": "Únete a tu alianza o crea una nueva.",
+  "onboarding.joinTab": "Unirse a alianza",
+  "onboarding.createTab": "Crear alianza",
+  "onboarding.playerName": "Nombre de jugador",
+  "onboarding.playerNamePlaceholder": "Tu nombre dentro del juego",
+  "onboarding.chiefId": "ID de jefe",
+  "onboarding.chiefIdPlaceholder": "Tu ID numérico de jefe",
+  "onboarding.allianceName": "Nombre de la alianza",
+  "onboarding.allianceNamePlaceholder": "p. ej. ICX",
+  "onboarding.state": "Estado",
+  "onboarding.statePlaceholder": "p. ej. 686",
+  "onboarding.alliancePassword": "Contraseña de la alianza",
+  "onboarding.joinPasswordPlaceholder": "Introduce la contraseña de tu R5",
+  "onboarding.createPasswordPlaceholder": "Elige al menos 8 caracteres",
+  "onboarding.becomeR5":
+    "Te convertirás en el R5 de esta alianza y podrás transferir el control a otro miembro más adelante.",
+  "onboarding.enterButton": "Entrar a Alliance HQ",
+  "onboarding.entering": "Entrando…",
+  "onboarding.creating": "Creando…",
+
+  "members.eyebrow": "Miembros de la alianza",
+  "members.title": "Tu alianza de un vistazo.",
+  "members.subtitle":
+    "Mantén juntos tu lista de miembros y sus datos principales. Las posiciones de eventos se gestionarán aparte.",
+  "members.addMember": "Añadir miembro",
+  "members.totalMembers": "Miembros totales",
+  "members.current": "Actuales",
+  "members.oldMembers": "Miembros antiguos",
+  "members.alliances": "Alianzas",
+  "members.tableMember": "Miembro",
+  "members.tableAlliance": "Alianza",
+  "members.tableChiefId": "ID de jefe",
+  "members.tablePower": "Poder",
+  "members.tableLevel": "Nivel",
+  "members.tableRank": "Rango",
+  "members.noMembers": "Todavía no hay miembros.",
+  "members.markOld": "Marcar como antiguo",
+  "members.delete": "Eliminar",
+  "members.noAlliance": "Sin alianza",
+  "members.namePlaceholder": "Nombre",
+};
+
+export default es;

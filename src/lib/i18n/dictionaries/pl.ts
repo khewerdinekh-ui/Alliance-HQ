@@ -1,0 +1,60 @@
+import type en from "./en";
+
+const pl: typeof en = {
+  "nav.members": "Członkowie",
+  "nav.percentages": "Procenty",
+  "nav.foundry": "Odlewnia",
+  "nav.canyon": "Kanion",
+  "nav.bear": "Niedźwiedź",
+  "nav.import": "Import",
+  "nav.admin": "Admin",
+  "nav.subscription": "Subskrypcja",
+  "nav.contact": "Kontakt",
+
+  "common.commandCentre": "Centrum dowodzenia",
+  "common.signOut": "Wyloguj się",
+
+  "onboarding.title": "Alliance HQ",
+  "onboarding.subtitle": "Dołącz do swojego sojuszu lub załóż nowy.",
+  "onboarding.joinTab": "Dołącz do sojuszu",
+  "onboarding.createTab": "Utwórz sojusz",
+  "onboarding.playerName": "Nazwa gracza",
+  "onboarding.playerNamePlaceholder": "Twoja nazwa w grze",
+  "onboarding.chiefId": "ID wodza",
+  "onboarding.chiefIdPlaceholder": "Twój numeryczny ID wodza",
+  "onboarding.allianceName": "Nazwa sojuszu",
+  "onboarding.allianceNamePlaceholder": "np. ICX",
+  "onboarding.state": "Stan",
+  "onboarding.statePlaceholder": "np. 686",
+  "onboarding.alliancePassword": "Hasło sojuszu",
+  "onboarding.joinPasswordPlaceholder": "Wpisz hasło otrzymane od R5",
+  "onboarding.createPasswordPlaceholder": "Wybierz co najmniej 8 znaków",
+  "onboarding.becomeR5":
+    "Zostaniesz R5 tego sojuszu i będziesz mógł później przekazać kontrolę innemu członkowi.",
+  "onboarding.enterButton": "Wejdź do Alliance HQ",
+  "onboarding.entering": "Logowanie…",
+  "onboarding.creating": "Tworzenie…",
+
+  "members.eyebrow": "Członkowie sojuszu",
+  "members.title": "Twój sojusz w skrócie.",
+  "members.subtitle":
+    "Trzymaj listę członków i ich podstawowe dane razem. Pozycje na wydarzeniach będą zarządzane osobno.",
+  "members.addMember": "Dodaj członka",
+  "members.totalMembers": "Członków łącznie",
+  "members.current": "Obecni",
+  "members.oldMembers": "Byli członkowie",
+  "members.alliances": "Sojusze",
+  "members.tableMember": "Członek",
+  "members.tableAlliance": "Sojusz",
+  "members.tableChiefId": "ID wodza",
+  "members.tablePower": "Moc",
+  "members.tableLevel": "Poziom",
+  "members.tableRank": "Ranga",
+  "members.noMembers": "Brak członków.",
+  "members.markOld": "Oznacz jako byłego",
+  "members.delete": "Usuń",
+  "members.noAlliance": "Brak sojuszu",
+  "members.namePlaceholder": "Imię",
+};
+
+export default pl;

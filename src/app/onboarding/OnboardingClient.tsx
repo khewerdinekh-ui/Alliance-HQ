@@ -3,8 +3,12 @@
 import { useActionState, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { createOrg, joinOrg } from "./actions";
+import type { Locale } from "@/lib/i18n/locales";
+import { useTranslations } from "@/lib/i18n/useTranslations";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
-export default function OnboardingClient() {
+export default function OnboardingClient({ initialLocale }: { initialLocale: Locale }) {
+  const { t } = useTranslations(initialLocale);
   const [tab, setTab] = useState<"join" | "create">("join");
   const [ready, setReady] = useState(false);
 
@@ -27,8 +31,13 @@ export default function OnboardingClient() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
       <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-900">Alliance HQ</h1>
-        <p className="mt-1 text-sm text-slate-500">Join your alliance or start a new one.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">{t("onboarding.title")}</h1>
+            <p className="mt-1 text-sm text-slate-500">{t("onboarding.subtitle")}</p>
+          </div>
+          <LanguageSwitcher initialLocale={initialLocale} />
+        </div>
 
         <div className="mt-6 flex rounded-full bg-slate-100 p-1 text-sm font-medium">
           <button
@@ -38,7 +47,7 @@ export default function OnboardingClient() {
               tab === "join" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
             }`}
           >
-            Join alliance
+            {t("onboarding.joinTab")}
           </button>
           <button
             type="button"
@@ -47,21 +56,41 @@ export default function OnboardingClient() {
               tab === "create" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
             }`}
           >
-            Create alliance
+            {t("onboarding.createTab")}
           </button>
         </div>
 
         {tab === "join" ? (
           <form action={joinAction} className="mt-6 space-y-4">
-            <Field label="Player name" name="displayName" placeholder="Your in-game name" required />
-            <Field label="Chief ID" name="chiefId" placeholder="Your numeric Chief ID" required />
-            <Field label="Alliance name" name="orgName" placeholder="e.g. ICX" required />
-            <Field label="State" name="state" placeholder="e.g. 686" required />
             <Field
-              label="Alliance password"
+              label={t("onboarding.playerName")}
+              name="displayName"
+              placeholder={t("onboarding.playerNamePlaceholder")}
+              required
+            />
+            <Field
+              label={t("onboarding.chiefId")}
+              name="chiefId"
+              placeholder={t("onboarding.chiefIdPlaceholder")}
+              required
+            />
+            <Field
+              label={t("onboarding.allianceName")}
+              name="orgName"
+              placeholder={t("onboarding.allianceNamePlaceholder")}
+              required
+            />
+            <Field
+              label={t("onboarding.state")}
+              name="state"
+              placeholder={t("onboarding.statePlaceholder")}
+              required
+            />
+            <Field
+              label={t("onboarding.alliancePassword")}
               name="password"
               type="password"
-              placeholder="Enter the password from your R5"
+              placeholder={t("onboarding.joinPasswordPlaceholder")}
               required
             />
 
@@ -72,30 +101,47 @@ export default function OnboardingClient() {
               disabled={!ready || joinPending}
               className="w-full rounded-lg bg-teal-600 py-2.5 text-sm font-medium text-white transition hover:bg-teal-700 disabled:opacity-60"
             >
-              {joinPending ? "Entering…" : "Enter Alliance HQ"}
+              {joinPending ? t("onboarding.entering") : t("onboarding.enterButton")}
             </button>
           </form>
         ) : (
           <form action={createAction} className="mt-6 space-y-4">
-            <Field label="Player name" name="displayName" placeholder="Your in-game name" required />
-            <Field label="Chief ID" name="chiefId" placeholder="Your numeric Chief ID" required />
+            <Field
+              label={t("onboarding.playerName")}
+              name="displayName"
+              placeholder={t("onboarding.playerNamePlaceholder")}
+              required
+            />
+            <Field
+              label={t("onboarding.chiefId")}
+              name="chiefId"
+              placeholder={t("onboarding.chiefIdPlaceholder")}
+              required
+            />
 
             <div className="rounded-xl border border-teal-100 bg-teal-50 p-4">
-              <Field label="Alliance name" name="orgName" placeholder="e.g. ICX" required />
+              <Field
+                label={t("onboarding.allianceName")}
+                name="orgName"
+                placeholder={t("onboarding.allianceNamePlaceholder")}
+                required
+              />
               <div className="mt-3">
-                <Field label="State" name="state" placeholder="e.g. 686" required />
+                <Field
+                  label={t("onboarding.state")}
+                  name="state"
+                  placeholder={t("onboarding.statePlaceholder")}
+                  required
+                />
               </div>
-              <p className="mt-3 text-xs text-teal-800">
-                You will become this alliance&apos;s R5 and can pass control to another member
-                later.
-              </p>
+              <p className="mt-3 text-xs text-teal-800">{t("onboarding.becomeR5")}</p>
             </div>
 
             <Field
-              label="Alliance password"
+              label={t("onboarding.alliancePassword")}
               name="password"
               type="password"
-              placeholder="Choose at least 8 characters"
+              placeholder={t("onboarding.createPasswordPlaceholder")}
               required
               minLength={8}
             />
@@ -107,7 +153,7 @@ export default function OnboardingClient() {
               disabled={!ready || createPending}
               className="w-full rounded-lg bg-teal-600 py-2.5 text-sm font-medium text-white transition hover:bg-teal-700 disabled:opacity-60"
             >
-              {createPending ? "Creating…" : "Enter Alliance HQ"}
+              {createPending ? t("onboarding.creating") : t("onboarding.enterButton")}
             </button>
           </form>
         )}

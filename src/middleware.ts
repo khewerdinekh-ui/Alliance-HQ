@@ -29,11 +29,13 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isOnboardingRoute = path.startsWith("/onboarding");
+  const isPublicRoute = isOnboardingRoute || path === "/contact" || path === "/subscription";
 
-  // No session yet (first visit): only /onboarding is reachable — it creates
-  // the anonymous session itself once the user submits Join/Create.
+  // No session yet (first visit): only public routes are reachable —
+  // /onboarding creates the anonymous session itself once the user submits
+  // Join/Create.
   if (!user) {
-    if (!isOnboardingRoute) {
+    if (!isPublicRoute) {
       const url = request.nextUrl.clone();
       url.pathname = "/onboarding";
       return NextResponse.redirect(url);
@@ -48,7 +50,7 @@ export async function middleware(request: NextRequest) {
 
   const hasOrg = (count ?? 0) > 0;
 
-  if (!hasOrg && !isOnboardingRoute) {
+  if (!hasOrg && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/onboarding";
     return NextResponse.redirect(url);

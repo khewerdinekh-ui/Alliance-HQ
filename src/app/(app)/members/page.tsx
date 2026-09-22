@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
+import { getTranslations } from "@/lib/i18n/getLocale";
 import { addMember, deleteMember, toggleMemberStatus } from "./actions";
 
 const RANKS = ["R1", "R2", "R3", "R4", "R5"];
@@ -7,6 +8,7 @@ const RANKS = ["R1", "R2", "R3", "R4", "R5"];
 export default async function MembersPage() {
   const membership = await requireMembership();
   const supabase = await createClient();
+  const { t } = await getTranslations();
   const orgId = membership.orgId;
   const isAdmin = membership.isAdmin;
 
@@ -24,27 +26,33 @@ export default async function MembersPage() {
 
   return (
     <>
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Total members" value={members?.length ?? 0} />
-        <StatCard label="Current" value={currentMembers.length} />
-        <StatCard label="Old members" value={oldMembers.length} />
-        <StatCard label="Alliances" value={subAlliances?.length ?? 0} />
+      <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">
+        {t("members.eyebrow")}
+      </p>
+      <h1 className="mt-1 text-2xl font-semibold text-slate-900">{t("members.title")}</h1>
+      <p className="mt-1 text-sm text-slate-500">{t("members.subtitle")}</p>
+
+      <div className="mb-6 mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <StatCard label={t("members.totalMembers")} value={members?.length ?? 0} />
+        <StatCard label={t("members.current")} value={currentMembers.length} />
+        <StatCard label={t("members.oldMembers")} value={oldMembers.length} />
+        <StatCard label={t("members.alliances")} value={subAlliances?.length ?? 0} />
       </div>
 
       {isAdmin && (
         <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">Add member</h2>
+          <h2 className="text-sm font-semibold text-slate-900">{t("members.addMember")}</h2>
           <form action={addMember} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-6">
             <input type="hidden" name="orgId" value={orgId} />
             <input
               name="name"
-              placeholder="Name"
+              placeholder={t("members.namePlaceholder")}
               required
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
             />
             <input
               name="chiefId"
-              placeholder="Chief ID"
+              placeholder={t("members.tableChiefId")}
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
             <select
@@ -52,7 +60,7 @@ export default async function MembersPage() {
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
               defaultValue=""
             >
-              <option value="">No alliance</option>
+              <option value="">{t("members.noAlliance")}</option>
               {subAlliances?.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
@@ -74,17 +82,17 @@ export default async function MembersPage() {
               type="submit"
               className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-teal-700"
             >
-              Add member
+              {t("members.addMember")}
             </button>
             <input
               name="power"
-              placeholder="Power"
+              placeholder={t("members.tablePower")}
               type="number"
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
             <input
               name="level"
-              placeholder="Level"
+              placeholder={t("members.tableLevel")}
               type="number"
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
@@ -96,12 +104,12 @@ export default async function MembersPage() {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-4 py-3">Member</th>
-              <th className="px-4 py-3">Alliance</th>
-              <th className="px-4 py-3">Chief ID</th>
-              <th className="px-4 py-3">Power</th>
-              <th className="px-4 py-3">Level</th>
-              <th className="px-4 py-3">Rank</th>
+              <th className="px-4 py-3">{t("members.tableMember")}</th>
+              <th className="px-4 py-3">{t("members.tableAlliance")}</th>
+              <th className="px-4 py-3">{t("members.tableChiefId")}</th>
+              <th className="px-4 py-3">{t("members.tablePower")}</th>
+              <th className="px-4 py-3">{t("members.tableLevel")}</th>
+              <th className="px-4 py-3">{t("members.tableRank")}</th>
               {isAdmin && <th className="px-4 py-3" />}
             </tr>
           </thead>
@@ -127,12 +135,14 @@ export default async function MembersPage() {
                         <input type="hidden" name="id" value={m.id} />
                         <input type="hidden" name="nextStatus" value="old" />
                         <button className="text-xs text-slate-500 hover:underline">
-                          Mark old
+                          {t("members.markOld")}
                         </button>
                       </form>
                       <form action={deleteMember}>
                         <input type="hidden" name="id" value={m.id} />
-                        <button className="text-xs text-red-600 hover:underline">Delete</button>
+                        <button className="text-xs text-red-600 hover:underline">
+                          {t("members.delete")}
+                        </button>
                       </form>
                     </div>
                   </td>
@@ -142,7 +152,7 @@ export default async function MembersPage() {
             {currentMembers.length === 0 && (
               <tr>
                 <td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-center text-slate-400">
-                  No members yet.
+                  {t("members.noMembers")}
                 </td>
               </tr>
             )}

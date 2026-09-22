@@ -1,0 +1,60 @@
+import type en from "./en";
+
+const fr: typeof en = {
+  "nav.members": "Membres",
+  "nav.percentages": "Pourcentages",
+  "nav.foundry": "Fonderie",
+  "nav.canyon": "Canyon",
+  "nav.bear": "Ours",
+  "nav.import": "Importer",
+  "nav.admin": "Admin",
+  "nav.subscription": "Abonnement",
+  "nav.contact": "Nous contacter",
+
+  "common.commandCentre": "Centre de commandement",
+  "common.signOut": "Se déconnecter",
+
+  "onboarding.title": "Alliance HQ",
+  "onboarding.subtitle": "Rejoignez votre alliance ou créez-en une nouvelle.",
+  "onboarding.joinTab": "Rejoindre une alliance",
+  "onboarding.createTab": "Créer une alliance",
+  "onboarding.playerName": "Nom du joueur",
+  "onboarding.playerNamePlaceholder": "Votre nom en jeu",
+  "onboarding.chiefId": "ID de chef",
+  "onboarding.chiefIdPlaceholder": "Votre ID de chef numérique",
+  "onboarding.allianceName": "Nom de l'alliance",
+  "onboarding.allianceNamePlaceholder": "ex. ICX",
+  "onboarding.state": "État",
+  "onboarding.statePlaceholder": "ex. 686",
+  "onboarding.alliancePassword": "Mot de passe de l'alliance",
+  "onboarding.joinPasswordPlaceholder": "Entrez le mot de passe de votre R5",
+  "onboarding.createPasswordPlaceholder": "Choisissez au moins 8 caractères",
+  "onboarding.becomeR5":
+    "Vous deviendrez le R5 de cette alliance et pourrez transférer le contrôle à un autre membre plus tard.",
+  "onboarding.enterButton": "Entrer dans Alliance HQ",
+  "onboarding.entering": "Connexion…",
+  "onboarding.creating": "Création…",
+
+  "members.eyebrow": "Membres de l'alliance",
+  "members.title": "Votre alliance en un coup d'œil.",
+  "members.subtitle":
+    "Gardez votre liste de membres et leurs informations principales ensemble. Les postes d'événements seront gérés séparément.",
+  "members.addMember": "Ajouter un membre",
+  "members.totalMembers": "Membres au total",
+  "members.current": "Actuels",
+  "members.oldMembers": "Anciens membres",
+  "members.alliances": "Alliances",
+  "members.tableMember": "Membre",
+  "members.tableAlliance": "Alliance",
+  "members.tableChiefId": "ID de chef",
+  "members.tablePower": "Puissance",
+  "members.tableLevel": "Niveau",
+  "members.tableRank": "Rang",
+  "members.noMembers": "Aucun membre pour le moment.",
+  "members.markOld": "Marquer comme ancien",
+  "members.delete": "Supprimer",
+  "members.noAlliance": "Aucune alliance",
+  "members.namePlaceholder": "Nom",
+};
+
+export default fr;
