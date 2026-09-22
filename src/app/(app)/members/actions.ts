@@ -2,29 +2,63 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { parsePower, parseLevel, parseAliases } from "@/lib/parseMemberFields";
 
-export async function addMember(formData: FormData) {
+export type MemberFormInput = {
+  id?: string;
+  orgId: string;
+  name: string;
+  chiefId: string;
+  subAllianceId: string;
+  allianceRank: string;
+  status: "current" | "old";
+  power: string;
+  level: string;
+  aliases: string;
+};
+
+export async function saveMember(input: MemberFormInput) {
+  const supabase = await createClient();
+  const name = input.name.trim();
+  if (!name) return { error: "Name is required." };
+
+  const row = {
+    org_id: input.orgId,
+    name,
+    chief_id: input.chiefId.trim() || null,
+    sub_alliance_id: input.subAllianceId || null,
+    alliance_rank: input.allianceRank || "R1",
+    status: input.status,
+    power: parsePower(input.power),
+    level: parseLevel(input.level),
+    aliases: parseAliases(input.aliases),
+  };
+
+  const { error } = input.id
+    ? await supabase.from("members").update(row).eq("id", input.id)
+    : await supabase.from("members").insert(row);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/members");
+  return { error: null };
+}
+
+const INLINE_FIELDS = new Set(["sub_alliance_id", "chief_id", "power", "level", "alliance_rank"]);
+
+export async function updateMemberField(id: string, field: string, value: string) {
+  if (!INLINE_FIELDS.has(field)) return;
   const supabase = await createClient();
 
-  const orgId = String(formData.get("orgId") ?? "");
-  const name = String(formData.get("name") ?? "").trim();
-  if (!orgId || !name) return;
+  let parsed: string | number | null = value;
+  if (field === "power") parsed = parsePower(value);
+  else if (field === "level") parsed = parseLevel(value);
+  else if (field === "sub_alliance_id" || field === "chief_id") parsed = value.trim() || null;
 
-  const chiefId = String(formData.get("chiefId") ?? "").trim() || null;
-  const subAllianceId = String(formData.get("subAllianceId") ?? "") || null;
-  const allianceRank = String(formData.get("allianceRank") ?? "R1");
-  const powerRaw = String(formData.get("power") ?? "").trim();
-  const levelRaw = String(formData.get("level") ?? "").trim();
-
-  await supabase.from("members").insert({
-    org_id: orgId,
-    name,
-    chief_id: chiefId,
-    sub_alliance_id: subAllianceId,
-    alliance_rank: allianceRank,
-    power: powerRaw ? Number(powerRaw) : null,
-    level: levelRaw ? Number(levelRaw) : null,
-  });
+  await supabase
+    .from("members")
+    .update({ [field]: parsed })
+    .eq("id", id);
 
   revalidatePath("/members");
 }
@@ -35,15 +69,5 @@ export async function deleteMember(formData: FormData) {
   if (!id) return;
 
   await supabase.from("members").delete().eq("id", id);
-  revalidatePath("/members");
-}
-
-export async function toggleMemberStatus(formData: FormData) {
-  const supabase = await createClient();
-  const id = String(formData.get("id") ?? "");
-  const nextStatus = String(formData.get("nextStatus") ?? "");
-  if (!id || !nextStatus) return;
-
-  await supabase.from("members").update({ status: nextStatus }).eq("id", id);
   revalidatePath("/members");
 }

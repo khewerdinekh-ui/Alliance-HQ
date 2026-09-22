@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
 import StatCard from "@/components/StatCard";
+import PercentagesTable from "@/components/PercentagesTable";
+import type { AttendanceEntry } from "@/components/AttendanceDetailModal";
 
 const TYPES = ["foundry", "canyon", "bear"] as const;
 
@@ -17,13 +19,14 @@ export default async function PercentagesPage() {
   const rangeStart = new Date();
   rangeStart.setMonth(rangeStart.getMonth() - 3);
 
-  const [{ data: members }, { data: events }] = await Promise.all([
+  const [{ data: members }, { data: subAlliances }, { data: events }] = await Promise.all([
     supabase
       .from("members")
-      .select("id, name, alliance_rank")
+      .select("id, name, chief_id, alliance_rank, sub_alliances(name)")
       .eq("org_id", orgId)
       .eq("status", "current")
       .order("name"),
+    supabase.from("sub_alliances").select("id, name").eq("org_id", orgId).order("name"),
     supabase
       .from("events")
       .select("id, event_type, event_date")
@@ -47,33 +50,65 @@ export default async function PercentagesPage() {
   };
   const totalEvents = eventsByType.foundry + eventsByType.canyon + eventsByType.bear;
 
-  const eventTypeById = new Map(events?.map((e) => [e.id, e.event_type]));
+  const eventById = new Map(events?.map((e) => [e.id, e]));
 
   const stats = new Map(
     members?.map((m) => [
       m.id,
       {
-        foundry: { attended: 0, excused: 0, noShow: 0, marked: 0 },
-        canyon: { attended: 0, excused: 0, noShow: 0, marked: 0 },
-        bear: { attended: 0, excused: 0, noShow: 0, marked: 0 },
+        foundry: { attended: 0, excused: 0, noShow: 0 },
+        canyon: { attended: 0, excused: 0, noShow: 0 },
+        bear: { attended: 0, excused: 0, noShow: 0 },
+        events: [] as AttendanceEntry[],
       },
     ])
   );
 
   for (const row of attendance ?? []) {
-    const type = eventTypeById.get(row.event_id) as (typeof TYPES)[number] | undefined;
+    const ev = eventById.get(row.event_id);
     const memberStats = stats.get(row.member_id);
-    if (!type || !memberStats) continue;
-    memberStats[type].marked += 1;
-    if (row.status === "attended") memberStats[type].attended += 1;
-    else if (row.status === "excused") memberStats[type].excused += 1;
-    else memberStats[type].noShow += 1;
+    if (!ev || !memberStats) continue;
+    const type = ev.event_type as (typeof TYPES)[number];
+    memberStats[type].attended += row.status === "attended" ? 1 : 0;
+    if (row.status === "excused") memberStats[type].excused += 1;
+    if (row.status === "no_show") memberStats[type].noShow += 1;
+    memberStats.events.push({
+      eventType: type,
+      eventDate: ev.event_date,
+      status: row.status as AttendanceEntry["status"],
+    });
   }
 
   function pct(numerator: number, denominator: number) {
     if (denominator <= 0) return 0;
     return Math.round((numerator / denominator) * 1000) / 10;
   }
+
+  const tableRows = (members ?? []).map((m) => {
+    const s = stats.get(m.id)!;
+    const foundryPct = pct(s.foundry.attended, eventsByType.foundry);
+    const canyonPct = pct(s.canyon.attended, eventsByType.canyon);
+    const bearPct = pct(s.bear.attended, eventsByType.bear);
+    const totalAttended = s.foundry.attended + s.canyon.attended + s.bear.attended;
+    const overallPct = pct(totalAttended, totalEvents);
+    const totalExcused = s.foundry.excused + s.canyon.excused + s.bear.excused;
+    const totalNoShow = s.foundry.noShow + s.canyon.noShow + s.bear.noShow;
+    const noShowPct = pct(totalNoShow, totalEvents - totalExcused);
+
+    return {
+      id: m.id,
+      name: m.name,
+      chiefId: m.chief_id,
+      allianceRank: m.alliance_rank,
+      allianceName: (m.sub_alliances as unknown as { name: string } | null)?.name ?? "",
+      foundryPct,
+      canyonPct,
+      bearPct,
+      overallPct,
+      noShowPct,
+      events: s.events,
+    };
+  });
 
   return (
     <>
@@ -94,61 +129,15 @@ export default async function PercentagesPage() {
       </div>
 
       <p className="mt-6 text-xs text-slate-500">
-        Overall attendance combines Foundry, Canyon and Bear. Excuses are excluded from
-        no-show %.
+        Overall attendance combines Foundry, Canyon and Bear. Tap any percentage for details.
+        Excuses are excluded from no-show %.
       </p>
 
-      <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Member</th>
-              <th className="px-4 py-3">Rank</th>
-              <th className="px-4 py-3">Foundry %</th>
-              <th className="px-4 py-3">Canyon %</th>
-              <th className="px-4 py-3">Bear %</th>
-              <th className="px-4 py-3">Overall %</th>
-              <th className="px-4 py-3">No-show %</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {members?.map((m) => {
-              const s = stats.get(m.id)!;
-              const foundryPct = pct(s.foundry.attended, eventsByType.foundry);
-              const canyonPct = pct(s.canyon.attended, eventsByType.canyon);
-              const bearPct = pct(s.bear.attended, eventsByType.bear);
-
-              const totalAttended = s.foundry.attended + s.canyon.attended + s.bear.attended;
-              const overallPct = pct(totalAttended, totalEvents);
-
-              const totalExcused = s.foundry.excused + s.canyon.excused + s.bear.excused;
-              const totalNoShow = s.foundry.noShow + s.canyon.noShow + s.bear.noShow;
-              const noShowDenominator = totalEvents - totalExcused;
-              const noShowPct = pct(totalNoShow, noShowDenominator);
-
-              return (
-                <tr key={m.id}>
-                  <td className="px-4 py-3 font-medium text-slate-900">{m.name}</td>
-                  <td className="px-4 py-3 text-slate-600">{m.alliance_rank}</td>
-                  <td className="px-4 py-3 text-slate-600">{foundryPct.toFixed(1)}%</td>
-                  <td className="px-4 py-3 text-slate-600">{canyonPct.toFixed(1)}%</td>
-                  <td className="px-4 py-3 text-slate-600">{bearPct.toFixed(1)}%</td>
-                  <td className="px-4 py-3 font-medium text-slate-900">
-                    {overallPct.toFixed(1)}%
-                  </td>
-                  <td className="px-4 py-3 text-red-600">{noShowPct.toFixed(1)}%</td>
-                </tr>
-              );
-            })}
-            {!members?.length && (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
-                  No members yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      <div className="mt-4">
+        <PercentagesTable
+          members={tableRows}
+          allianceNames={subAlliances?.map((a) => a.name) ?? []}
+        />
       </div>
     </>
   );

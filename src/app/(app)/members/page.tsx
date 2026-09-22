@@ -4,9 +4,6 @@ import { getTranslations } from "@/lib/i18n/getLocale";
 import { computeOverallPercents } from "@/lib/attendance";
 import StatCard from "@/components/StatCard";
 import MembersTable from "@/components/MembersTable";
-import { addMember } from "./actions";
-
-const RANKS = ["R1", "R2", "R3", "R4", "R5"];
 
 export default async function MembersPage() {
   const membership = await requireMembership();
@@ -19,7 +16,9 @@ export default async function MembersPage() {
     supabase.from("sub_alliances").select("id, name").eq("org_id", orgId).order("name"),
     supabase
       .from("members")
-      .select("id, name, chief_id, power, level, alliance_rank, status, sub_alliances(name)")
+      .select(
+        "id, name, chief_id, power, level, alliance_rank, status, sub_alliance_id, aliases, sub_alliances(name)"
+      )
       .eq("org_id", orgId)
       .order("name"),
     computeOverallPercents(supabase, orgId),
@@ -36,6 +35,8 @@ export default async function MembersPage() {
     level: m.level,
     alliance_rank: m.alliance_rank,
     status: m.status,
+    sub_alliance_id: m.sub_alliance_id,
+    aliases: m.aliases ?? [],
     allianceName: (m.sub_alliances as unknown as { name: string } | null)?.name ?? "",
     overallPct: overallPercents.get(m.id) ?? 0,
   }));
@@ -59,72 +60,10 @@ export default async function MembersPage() {
         />
       </div>
 
-      {isAdmin && (
-        <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">{t("members.addMember")}</h2>
-          </div>
-          <form action={addMember} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-6">
-            <input type="hidden" name="orgId" value={orgId} />
-            <input
-              name="name"
-              placeholder={t("members.namePlaceholder")}
-              required
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
-            />
-            <input
-              name="chiefId"
-              placeholder={t("members.tableChiefId")}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-            <select
-              name="subAllianceId"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              defaultValue=""
-            >
-              <option value="">{t("members.noAlliance")}</option>
-              {subAlliances?.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-            <select
-              name="allianceRank"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              defaultValue="R1"
-            >
-              {RANKS.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-            <button
-              type="submit"
-              className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-teal-700"
-            >
-              {t("members.addMember")}
-            </button>
-            <input
-              name="power"
-              placeholder={t("members.tablePower")}
-              type="number"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-            <input
-              name="level"
-              placeholder={t("members.tableLevel")}
-              type="number"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-          </form>
-        </div>
-      )}
-
       <MembersTable
+        orgId={orgId}
         members={tableRows}
-        allianceNames={subAlliances?.map((a) => a.name) ?? []}
+        subAlliances={subAlliances ?? []}
         isAdmin={isAdmin}
       />
     </>
