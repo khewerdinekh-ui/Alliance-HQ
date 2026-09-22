@@ -99,6 +99,7 @@ export default async function EventAttendancePage({
         .select("member_id, status")
         .eq("event_id", mostRecentEvent.id)
         .eq("status", "no_show")
+        .eq("signed_up", true)
     : { data: [] as { member_id: string; status: string }[] };
 
   const doNotSignUp = (latestAttendance ?? [])
