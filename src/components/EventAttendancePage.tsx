@@ -11,6 +11,7 @@ import EventDatePicker from "@/components/EventDatePicker";
 import AttendanceGrid from "@/components/AttendanceGrid";
 import DoNotSignUpPanel from "@/components/DoNotSignUpPanel";
 import AttendanceImportClient from "@/components/AttendanceImportClient";
+import ScreenshotImportClient from "@/components/ScreenshotImportClient";
 
 const LABELS: Record<EventType, string> = {
   foundry: "Foundry",
@@ -345,6 +346,7 @@ export default async function EventAttendancePage({
         {isAdmin && activeEvent && (
           <div className="border-t border-slate-100 px-5 py-4">
             <AttendanceImportClient orgId={orgId} eventId={activeEvent.id} eventType={eventType} />
+            <ScreenshotImportClient orgId={orgId} eventId={activeEvent.id} eventType={eventType} />
           </div>
         )}
       </div>

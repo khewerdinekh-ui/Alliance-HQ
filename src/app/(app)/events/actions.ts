@@ -2,8 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { extractAttendanceFromImages, type ExtractedAttendanceRow } from "@/lib/screenshotImport";
 
 export type EventType = "foundry" | "canyon" | "bear";
+
+export async function extractAttendanceScreenshot(
+  dataUrls: string[]
+): Promise<{ rows: ExtractedAttendanceRow[]; error: string | null }> {
+  try {
+    const rows = await extractAttendanceFromImages(dataUrls);
+    return { rows, error: null };
+  } catch (err) {
+    return { rows: [], error: err instanceof Error ? err.message : "Extraction failed." };
+  }
+}
 
 export async function createEvent(formData: FormData) {
   const supabase = await createClient();
