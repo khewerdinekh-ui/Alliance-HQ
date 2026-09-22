@@ -32,6 +32,7 @@ export default function AttendanceGrid({
   rows: Row[];
   isAdmin: boolean;
 }) {
+  const showLegion = eventType !== "bear";
   const [search, setSearch] = useState("");
   const [legionFilter, setLegionFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -85,18 +86,20 @@ export default function AttendanceGrid({
             className="w-full rounded-full border border-slate-200 bg-white py-1.5 px-3 text-sm focus:border-teal-500 focus:outline-none"
           />
         </div>
-        <select
-          value={legionFilter}
-          onChange={(e) => setLegionFilter(e.target.value)}
-          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:border-teal-500 focus:outline-none"
-        >
-          <option value="all">All legions</option>
-          {LEGIONS.map((l) => (
-            <option key={l} value={l}>
-              {l}
-            </option>
-          ))}
-        </select>
+        {showLegion && (
+          <select
+            value={legionFilter}
+            onChange={(e) => setLegionFilter(e.target.value)}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:border-teal-500 focus:outline-none"
+          >
+            <option value="all">All legions</option>
+            {LEGIONS.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-3 px-5 py-4 sm:max-w-md">
@@ -109,8 +112,10 @@ export default function AttendanceGrid({
         <thead className="border-t border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
           <tr>
             <Th label="Member" k="name" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-            <Th label="Legion" k="legion" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-            <th className="px-4 py-2">Main / Sub</th>
+            {showLegion && (
+              <Th label="Legion" k="legion" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+            )}
+            {showLegion && <th className="px-4 py-2">Main / Sub</th>}
             <Th label="Signed up" k="signedUp" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
             <Th label="Arrival" k="arrived" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
             <th className="px-4 py-2">Reason if absent</th>
@@ -137,42 +142,46 @@ export default function AttendanceGrid({
                   </button>
                 )}
               </td>
-              <td className="px-4 py-3 align-top">
-                {isAdmin ? (
-                  <select
-                    key={`legion-${r.memberId}-${r.legion ?? ""}`}
-                    defaultValue={r.legion ?? ""}
-                    onChange={(e) => save(r.memberId, { legion: e.target.value })}
-                    className="rounded-full border border-slate-200 px-2 py-1 text-xs focus:border-teal-500 focus:outline-none"
-                  >
-                    <option value="">—</option>
-                    {LEGIONS.map((l) => (
-                      <option key={l} value={l}>
-                        {l}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  r.legion ?? "—"
-                )}
-              </td>
-              <td className="px-4 py-3 align-top">
-                {isAdmin ? (
-                  <select
-                    key={`lineup-${r.memberId}-${r.lineupRole}`}
-                    defaultValue={r.lineupRole}
-                    onChange={(e) =>
-                      save(r.memberId, { lineupRole: e.target.value as "main" | "sub" })
-                    }
-                    className="rounded-full border border-slate-200 px-2 py-1 text-xs capitalize focus:border-teal-500 focus:outline-none"
-                  >
-                    <option value="main">Main</option>
-                    <option value="sub">Sub</option>
-                  </select>
-                ) : (
-                  <span className="capitalize">{r.lineupRole}</span>
-                )}
-              </td>
+              {showLegion && (
+                <td className="px-4 py-3 align-top">
+                  {isAdmin ? (
+                    <select
+                      key={`legion-${r.memberId}-${r.legion ?? ""}`}
+                      defaultValue={r.legion ?? ""}
+                      onChange={(e) => save(r.memberId, { legion: e.target.value })}
+                      className="rounded-full border border-slate-200 px-2 py-1 text-xs focus:border-teal-500 focus:outline-none"
+                    >
+                      <option value="">—</option>
+                      {LEGIONS.map((l) => (
+                        <option key={l} value={l}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    r.legion ?? "—"
+                  )}
+                </td>
+              )}
+              {showLegion && (
+                <td className="px-4 py-3 align-top">
+                  {isAdmin ? (
+                    <select
+                      key={`lineup-${r.memberId}-${r.lineupRole}`}
+                      defaultValue={r.lineupRole}
+                      onChange={(e) =>
+                        save(r.memberId, { lineupRole: e.target.value as "main" | "sub" })
+                      }
+                      className="rounded-full border border-slate-200 px-2 py-1 text-xs capitalize focus:border-teal-500 focus:outline-none"
+                    >
+                      <option value="main">Main</option>
+                      <option value="sub">Sub</option>
+                    </select>
+                  ) : (
+                    <span className="capitalize">{r.lineupRole}</span>
+                  )}
+                </td>
+              )}
               <td className="px-4 py-3 align-top">
                 {isAdmin ? (
                   <label className="flex items-center gap-1.5 text-xs text-slate-600">
@@ -228,7 +237,7 @@ export default function AttendanceGrid({
           ))}
           {filtered.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+              <td colSpan={showLegion ? 6 : 4} className="px-4 py-8 text-center text-slate-400">
                 No members match.
               </td>
             </tr>
