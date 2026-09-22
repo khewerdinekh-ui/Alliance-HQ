@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
 import { getTranslations } from "@/lib/i18n/getLocale";
+import StatCard from "@/components/StatCard";
 import { addMember, deleteMember, toggleMemberStatus } from "./actions";
 
 const RANKS = ["R1", "R2", "R3", "R4", "R5"];
@@ -33,10 +34,14 @@ export default async function MembersPage() {
       <p className="mt-1 text-sm text-slate-500">{t("members.subtitle")}</p>
 
       <div className="mb-6 mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label={t("members.totalMembers")} value={members?.length ?? 0} />
-        <StatCard label={t("members.current")} value={currentMembers.length} />
-        <StatCard label={t("members.oldMembers")} value={oldMembers.length} />
-        <StatCard label={t("members.alliances")} value={subAlliances?.length ?? 0} />
+        <StatCard label={t("members.totalMembers")} value={members?.length ?? 0} accent="teal" />
+        <StatCard label={t("members.current")} value={currentMembers.length} accent="violet" />
+        <StatCard label={t("members.oldMembers")} value={oldMembers.length} accent="slate" />
+        <StatCard
+          label={t("members.alliances")}
+          value={subAlliances?.length ?? 0}
+          accent="amber"
+        />
       </div>
 
       {isAdmin && (
@@ -160,14 +165,5 @@ export default async function MembersPage() {
         </table>
       </div>
     </>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
-    </div>
   );
 }

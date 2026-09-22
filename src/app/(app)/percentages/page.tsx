@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
+import StatCard from "@/components/StatCard";
 
 const TYPES = ["foundry", "canyon", "bear"] as const;
 
@@ -85,11 +86,11 @@ export default async function PercentagesPage() {
       </p>
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-5">
-        <StatCard label="Members" value={members?.length ?? 0} />
-        <StatCard label="Total events" value={totalEvents} />
-        <StatCard label="Foundry" value={eventsByType.foundry} />
-        <StatCard label="Canyon" value={eventsByType.canyon} />
-        <StatCard label="Bear" value={eventsByType.bear} />
+        <StatCard label="Members" value={members?.length ?? 0} accent="violet" />
+        <StatCard label="Total events" value={totalEvents} accent="teal" />
+        <StatCard label="Foundry" value={eventsByType.foundry} accent="amber" />
+        <StatCard label="Canyon" value={eventsByType.canyon} accent="amber" />
+        <StatCard label="Bear" value={eventsByType.bear} accent="amber" />
       </div>
 
       <p className="mt-6 text-xs text-slate-500">
@@ -150,14 +151,5 @@ export default async function PercentagesPage() {
         </table>
       </div>
     </>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
-    </div>
   );
 }
