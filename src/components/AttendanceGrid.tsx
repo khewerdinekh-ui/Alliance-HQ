@@ -34,6 +34,7 @@ export default function AttendanceGrid({
 }) {
   const showLegion = eventType !== "bear";
   const showPunish = eventType !== "bear";
+  const showSignedUp = eventType !== "bear";
   const [search, setSearch] = useState("");
   const [legionFilter, setLegionFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -103,8 +104,8 @@ export default function AttendanceGrid({
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-3 px-5 py-4 sm:max-w-md">
-        <Stat label="Signed up" value={signedUpCount} tone="slate" />
+      <div className={`grid gap-3 px-5 py-4 sm:max-w-md ${showSignedUp ? "grid-cols-3" : "grid-cols-2"}`}>
+        {showSignedUp && <Stat label="Signed up" value={signedUpCount} tone="slate" />}
         <Stat label="Arrived" value={arrivedCount} tone="emerald" />
         <Stat label="Did not arrive" value={didNotArriveCount} tone="red" />
       </div>
@@ -117,7 +118,9 @@ export default function AttendanceGrid({
               <Th label="Legion" k="legion" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
             )}
             {showLegion && <th className="px-4 py-2">Main / Sub</th>}
-            <Th label="Signed up" k="signedUp" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+            {showSignedUp && (
+              <Th label="Signed up" k="signedUp" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+            )}
             <Th label="Arrival" k="arrived" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
             <th className="px-4 py-2">Reason if absent</th>
           </tr>
@@ -183,24 +186,26 @@ export default function AttendanceGrid({
                   )}
                 </td>
               )}
-              <td className="px-4 py-3 align-top">
-                {isAdmin ? (
-                  <label className="flex items-center gap-1.5 text-xs text-slate-600">
-                    <input
-                      key={`signedup-${r.memberId}-${r.signedUp}`}
-                      type="checkbox"
-                      defaultChecked={r.signedUp}
-                      onChange={(e) => save(r.memberId, { signedUp: e.target.checked })}
-                      className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                    />
-                    Signed up
-                  </label>
-                ) : r.signedUp ? (
-                  "Signed up"
-                ) : (
-                  "—"
-                )}
-              </td>
+              {showSignedUp && (
+                <td className="px-4 py-3 align-top">
+                  {isAdmin ? (
+                    <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                      <input
+                        key={`signedup-${r.memberId}-${r.signedUp}`}
+                        type="checkbox"
+                        defaultChecked={r.signedUp}
+                        onChange={(e) => save(r.memberId, { signedUp: e.target.checked })}
+                        className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                      />
+                      Signed up
+                    </label>
+                  ) : r.signedUp ? (
+                    "Signed up"
+                  ) : (
+                    "—"
+                  )}
+                </td>
+              )}
               <td className="px-4 py-3 align-top">
                 {isAdmin ? (
                   <select
@@ -238,7 +243,10 @@ export default function AttendanceGrid({
           ))}
           {filtered.length === 0 && (
             <tr>
-              <td colSpan={showLegion ? 6 : 4} className="px-4 py-8 text-center text-slate-400">
+              <td
+                colSpan={2 + (showLegion ? 2 : 0) + (showSignedUp ? 1 : 0) + 1}
+                className="px-4 py-8 text-center text-slate-400"
+              >
                 No members match.
               </td>
             </tr>

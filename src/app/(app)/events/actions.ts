@@ -40,6 +40,49 @@ export async function deleteEvent(formData: FormData) {
   revalidatePath(`/${eventType}`);
 }
 
+// Bear times are per-org (4 daily slots), editable by admins.
+export async function updateBearTimes(formData: FormData) {
+  const supabase = await createClient();
+  const orgId = String(formData.get("orgId") ?? "");
+  if (!orgId) return;
+
+  const times = [1, 2, 3, 4].map((n) => String(formData.get(`bearTime${n}`) ?? "").trim() || null);
+
+  await supabase
+    .from("orgs")
+    .update({ bear_time_1: times[0], bear_time_2: times[1], bear_time_3: times[2], bear_time_4: times[3] })
+    .eq("id", orgId);
+
+  revalidatePath("/bear");
+}
+
+// One Bear event per (date, slot) — 4 slots on the same date count as a single
+// event for percentage purposes, but attendance is tracked per slot.
+export async function createBearEvent(formData: FormData) {
+  const supabase = await createClient();
+  const orgId = String(formData.get("orgId") ?? "");
+  const eventDate = String(formData.get("eventDate") ?? "");
+  const bearSlot = Number(formData.get("bearSlot") ?? "0");
+  if (!orgId || !eventDate || !bearSlot || bearSlot < 1 || bearSlot > 4) return;
+
+  const { data: existing } = await supabase
+    .from("events")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("event_type", "bear")
+    .eq("event_date", eventDate)
+    .eq("bear_slot", bearSlot)
+    .maybeSingle();
+
+  if (!existing) {
+    await supabase
+      .from("events")
+      .insert({ org_id: orgId, event_type: "bear", event_date: eventDate, bear_slot: bearSlot });
+  }
+
+  revalidatePath("/bear");
+}
+
 export type AttendanceFieldUpdate = {
   orgId: string;
   eventId: string;

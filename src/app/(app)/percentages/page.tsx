@@ -43,14 +43,44 @@ export default async function PercentagesPage() {
         .in("event_id", eventIds)
     : { data: [] as { event_id: string; member_id: string; status: string }[] };
 
+  // Bear runs 4 slots per date, but all 4 count as ONE event: fold every Bear
+  // event id on the same date into a single "unit" for both the denominators
+  // (event counts) and the per-member tally below. Foundry/Canyon events are
+  // each their own unit, same as before.
+  type Unit = { type: (typeof TYPES)[number]; eventDate: string };
+  const unitByEventId = new Map<string, string>();
+  const unitInfo = new Map<string, Unit>();
+  for (const e of events ?? []) {
+    const type = e.event_type as (typeof TYPES)[number];
+    const unitKey = type === "bear" ? `bear-${e.event_date}` : e.id;
+    unitByEventId.set(e.id, unitKey);
+    if (!unitInfo.has(unitKey)) unitInfo.set(unitKey, { type, eventDate: e.event_date });
+  }
+
+  const units = [...unitInfo.values()];
   const eventsByType = {
-    foundry: events?.filter((e) => e.event_type === "foundry").length ?? 0,
-    canyon: events?.filter((e) => e.event_type === "canyon").length ?? 0,
-    bear: events?.filter((e) => e.event_type === "bear").length ?? 0,
+    foundry: units.filter((u) => u.type === "foundry").length,
+    canyon: units.filter((u) => u.type === "canyon").length,
+    bear: units.filter((u) => u.type === "bear").length,
   };
   const totalEvents = eventsByType.foundry + eventsByType.canyon + eventsByType.bear;
 
-  const eventById = new Map(events?.map((e) => [e.id, e]));
+  // Per member per unit, keep the best status across that unit's slot(s):
+  // attended beats excused beats no_show (so one attended Bear slot marks the
+  // whole day attended, matching the alliance's "1/1 not 1/4" rule).
+  const statusPriority = { attended: 3, excused: 2, no_show: 1 } as const;
+  const memberUnitStatus = new Map<string, Map<string, AttendanceEntry["status"]>>();
+  for (const row of attendance ?? []) {
+    const unitKey = unitByEventId.get(row.event_id);
+    if (!unitKey) continue;
+    if (!memberUnitStatus.has(row.member_id)) memberUnitStatus.set(row.member_id, new Map());
+    const memberUnits = memberUnitStatus.get(row.member_id)!;
+    const status = row.status as AttendanceEntry["status"];
+    const existing = memberUnits.get(unitKey);
+    if (!existing || statusPriority[status] > statusPriority[existing]) {
+      memberUnits.set(unitKey, status);
+    }
+  }
 
   const stats = new Map(
     members?.map((m) => [
@@ -64,19 +94,18 @@ export default async function PercentagesPage() {
     ])
   );
 
-  for (const row of attendance ?? []) {
-    const ev = eventById.get(row.event_id);
-    const memberStats = stats.get(row.member_id);
-    if (!ev || !memberStats) continue;
-    const type = ev.event_type as (typeof TYPES)[number];
-    memberStats[type].attended += row.status === "attended" ? 1 : 0;
-    if (row.status === "excused") memberStats[type].excused += 1;
-    if (row.status === "no_show") memberStats[type].noShow += 1;
-    memberStats.events.push({
-      eventType: type,
-      eventDate: ev.event_date,
-      status: row.status as AttendanceEntry["status"],
-    });
+  for (const [memberId, memberUnits] of memberUnitStatus) {
+    const memberStats = stats.get(memberId);
+    if (!memberStats) continue;
+    for (const [unitKey, status] of memberUnits) {
+      const info = unitInfo.get(unitKey);
+      if (!info) continue;
+      const bucket = memberStats[info.type];
+      if (status === "attended") bucket.attended += 1;
+      else if (status === "excused") bucket.excused += 1;
+      else bucket.noShow += 1;
+      memberStats.events.push({ eventType: info.type, eventDate: info.eventDate, status });
+    }
   }
 
   function pct(numerator: number, denominator: number) {

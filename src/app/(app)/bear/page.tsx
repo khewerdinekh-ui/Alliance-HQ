@@ -1,4 +1,4 @@
-import EventAttendancePage from "@/components/EventAttendancePage";
+import BearAttendancePage from "@/components/BearAttendancePage";
 
 export default async function BearPage({
   searchParams,
@@ -6,5 +6,5 @@ export default async function BearPage({
   searchParams: Promise<{ event?: string }>;
 }) {
   const { event } = await searchParams;
-  return <EventAttendancePage eventType="bear" selectedEventId={event} />;
+  return <BearAttendancePage selectedEventId={event} />;
 }
