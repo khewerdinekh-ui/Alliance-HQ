@@ -64,11 +64,13 @@ export default async function BearAttendancePage({ selectedEventId }: { selected
 
   return (
     <>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-700">Bear</h2>
-      <h1 className="mt-1 text-2xl font-semibold text-slate-900">Bear results and attendance.</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        Set the four Bear times and import each result. No sign-ups or punishments are used here.
-      </p>
+      <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 via-amber-500 to-orange-600 px-6 py-6 text-white shadow-sm shadow-amber-500/20">
+        <p className="text-xs font-semibold uppercase tracking-wide text-amber-50/80">🐻 Bear</p>
+        <h1 className="mt-1 text-2xl font-semibold">Bear results and attendance.</h1>
+        <p className="mt-1 text-sm text-amber-50/90">
+          Set the four Bear times and import each result. No sign-ups or punishments are used here.
+        </p>
+      </div>
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center gap-3 px-5 py-4">
@@ -91,19 +93,19 @@ export default async function BearAttendancePage({ selectedEventId }: { selected
           >
             <input type="hidden" name="orgId" value={orgId} />
             {[0, 1, 2, 3].map((i) => (
-              <label key={i} className="text-xs text-slate-500">
+              <label key={i} className="text-xs font-medium text-slate-500">
                 Bear {i + 1}
                 <input
                   type="time"
                   name={`bearTime${i + 1}`}
                   defaultValue={bearTimes[i]}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm transition focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
                 />
               </label>
             ))}
             <button
               type="submit"
-              className="col-span-2 mt-1 rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 sm:col-span-4"
+              className="col-span-2 mt-1 rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-amber-500/30 transition hover:bg-amber-600 sm:col-span-4"
             >
               Save times
             </button>
@@ -111,9 +113,9 @@ export default async function BearAttendancePage({ selectedEventId }: { selected
         ) : (
           <div className="grid grid-cols-2 gap-3 border-t border-slate-100 px-5 py-4 sm:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="text-xs text-slate-500">
+              <div key={i} className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
                 Bear {i + 1}
-                <p className="mt-1 text-sm font-medium text-slate-900">{bearTimes[i] || "—"}</p>
+                <p className="mt-0.5 text-sm font-semibold text-slate-900">{bearTimes[i] || "—"}</p>
               </div>
             ))}
           </div>
@@ -171,36 +173,47 @@ export default async function BearAttendancePage({ selectedEventId }: { selected
 
       {events && events.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
-          {events.map((e) => (
-            <Link
-              key={e.id}
-              href={`/bear?event=${e.id}`}
-              className={`rounded-xl border px-4 py-2 text-sm shadow-sm transition ${
-                activeEvent?.id === e.id
-                  ? "border-amber-300 bg-amber-50 text-amber-800"
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <p className="font-semibold">{slotLabel(e.bear_slot)}</p>
-              <p className="text-xs text-slate-500">
-                {new Date(e.event_date).toLocaleDateString(undefined, {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                })}
-              </p>
-            </Link>
-          ))}
+          {events.map((e) => {
+            const active = activeEvent?.id === e.id;
+            return (
+              <Link
+                key={e.id}
+                href={`/bear?event=${e.id}`}
+                className={`rounded-xl border px-4 py-2 text-sm transition ${
+                  active
+                    ? "border-transparent bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-sm shadow-amber-500/30"
+                    : "border-slate-200 bg-white text-slate-700 shadow-sm hover:border-amber-200 hover:bg-amber-50/50"
+                }`}
+              >
+                <p className="font-semibold">{slotLabel(e.bear_slot)}</p>
+                <p className={`text-xs ${active ? "text-amber-50/90" : "text-slate-500"}`}>
+                  {new Date(e.event_date).toLocaleDateString(undefined, {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })}
+                </p>
+              </Link>
+            );
+          })}
         </div>
       )}
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 px-5 py-4">
-          <div>
-            <p className="text-xs text-slate-500">Bear event</p>
-            <p className="text-sm font-semibold text-slate-900">
-              {activeEvent ? `Viewing ${slotLabel(activeEvent.bear_slot)}` : "No Bear event yet"}
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+              <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+                <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Bear event</p>
+              <p className="text-sm font-semibold text-slate-900">
+                {activeEvent ? `Viewing ${slotLabel(activeEvent.bear_slot)}` : "No Bear event yet"}
+              </p>
+            </div>
           </div>
           {isAdmin && activeEvent && (
             <form action={deleteEvent}>
