@@ -14,6 +14,7 @@ drop table if exists profiles;
 drop function if exists set_updated_at();
 drop function if exists create_org(text, text, text, text, text);
 drop function if exists join_org(text, text, text, text);
+drop function if exists join_org(text, text, text, text, text);
 drop function if exists is_org_member(uuid);
 drop function if exists is_org_admin(uuid);
 
@@ -185,9 +186,10 @@ begin
 end;
 $$ language plpgsql security definer;
 
--- Join an existing org by name + shared password.
+-- Join an existing org by name + state + shared password.
 create or replace function join_org(
   org_name text,
+  org_state text,
   org_password text,
   chief_id text,
   display_name text
@@ -200,6 +202,10 @@ begin
 
   if target_org.id is null then
     raise exception 'No alliance found with that name';
+  end if;
+
+  if coalesce(target_org.state, '') <> coalesce(org_state, '') then
+    raise exception 'Alliance name and state don''t match';
   end if;
 
   if target_org.password_hash <> crypt(org_password, target_org.password_hash) then

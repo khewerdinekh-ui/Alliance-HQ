@@ -17,7 +17,7 @@ export default function CreateOrgPage() {
 
         <form action={formAction} className="mt-6 space-y-4">
           <Field label="Alliance name" name="orgName" required />
-          <Field label="State" name="state" />
+          <Field label="State" name="state" required />
           <Field label="Alliance password" name="password" type="password" required />
           <Field label="Your Chief ID" name="chiefId" required />
           <Field label="Your in-game name" name="displayName" required />
