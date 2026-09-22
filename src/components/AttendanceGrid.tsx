@@ -35,6 +35,7 @@ export default function AttendanceGrid({
   const showLegion = eventType !== "bear";
   const showPunish = eventType !== "bear";
   const showSignedUp = eventType !== "bear";
+  const showReason = eventType !== "bear";
   const [search, setSearch] = useState("");
   const [legionFilter, setLegionFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -122,7 +123,7 @@ export default function AttendanceGrid({
               <Th label="Signed up" k="signedUp" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
             )}
             <Th label="Arrival" k="arrived" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-            <th className="px-4 py-2">Reason if absent</th>
+            {showReason && <th className="px-4 py-2">Reason if absent</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -227,24 +228,26 @@ export default function AttendanceGrid({
                   </span>
                 )}
               </td>
-              <td className="px-4 py-3 align-top">
-                {isAdmin ? (
-                  <ReasonInput
-                    key={`reason-${r.memberId}-${r.reason}`}
-                    initial={r.reason}
-                    disabled={r.arrived}
-                    onCommit={(value) => save(r.memberId, { reason: value })}
-                  />
-                ) : (
-                  r.reason || "—"
-                )}
-              </td>
+              {showReason && (
+                <td className="px-4 py-3 align-top">
+                  {isAdmin ? (
+                    <ReasonInput
+                      key={`reason-${r.memberId}-${r.reason}`}
+                      initial={r.reason}
+                      disabled={r.arrived}
+                      onCommit={(value) => save(r.memberId, { reason: value })}
+                    />
+                  ) : (
+                    r.reason || "—"
+                  )}
+                </td>
+              )}
             </tr>
           ))}
           {filtered.length === 0 && (
             <tr>
               <td
-                colSpan={2 + (showLegion ? 2 : 0) + (showSignedUp ? 1 : 0) + 1}
+                colSpan={2 + (showLegion ? 2 : 0) + (showSignedUp ? 1 : 0) + (showReason ? 1 : 0)}
                 className="px-4 py-8 text-center text-slate-400"
               >
                 No members match.

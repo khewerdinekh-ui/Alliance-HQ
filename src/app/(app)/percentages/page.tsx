@@ -29,7 +29,7 @@ export default async function PercentagesPage() {
     supabase.from("sub_alliances").select("id, name").eq("org_id", orgId).order("name"),
     supabase
       .from("events")
-      .select("id, event_type, event_date")
+      .select("id, event_type, event_date, bear_slot")
       .eq("org_id", orgId)
       .gte("event_date", formatDate(rangeStart))
       .lte("event_date", formatDate(rangeEnd)),
@@ -50,11 +50,16 @@ export default async function PercentagesPage() {
   type Unit = { type: (typeof TYPES)[number]; eventDate: string };
   const unitByEventId = new Map<string, string>();
   const unitInfo = new Map<string, Unit>();
+  const eventInfoById = new Map<
+    string,
+    { type: (typeof TYPES)[number]; eventDate: string; bearSlot: number | null }
+  >();
   for (const e of events ?? []) {
     const type = e.event_type as (typeof TYPES)[number];
     const unitKey = type === "bear" ? `bear-${e.event_date}` : e.id;
     unitByEventId.set(e.id, unitKey);
     if (!unitInfo.has(unitKey)) unitInfo.set(unitKey, { type, eventDate: e.event_date });
+    eventInfoById.set(e.id, { type, eventDate: e.event_date, bearSlot: e.bear_slot ?? null });
   }
 
   const units = [...unitInfo.values()];
@@ -104,8 +109,22 @@ export default async function PercentagesPage() {
       if (status === "attended") bucket.attended += 1;
       else if (status === "excused") bucket.excused += 1;
       else bucket.noShow += 1;
-      memberStats.events.push({ eventType: info.type, eventDate: info.eventDate, status });
     }
+  }
+
+  // Detail-view entries are per individual event (so a member's Bear history
+  // shows which slot they attended, e.g. "Bear 2"), separate from the
+  // unit-collapsed totals above used for the percentages themselves.
+  for (const row of attendance ?? []) {
+    const info = eventInfoById.get(row.event_id);
+    const memberStats = stats.get(row.member_id);
+    if (!info || !memberStats) continue;
+    memberStats.events.push({
+      eventType: info.type,
+      eventDate: info.eventDate,
+      status: row.status as AttendanceEntry["status"],
+      bearSlot: info.bearSlot,
+    });
   }
 
   function pct(numerator: number, denominator: number) {

@@ -1,9 +1,12 @@
 "use client";
 
+import { useMemo, useState } from "react";
+
 export type AttendanceEntry = {
   eventType: "foundry" | "canyon" | "bear";
   eventDate: string;
   status: "attended" | "excused" | "no_show";
+  bearSlot?: number | null;
 };
 
 const TYPE_LABELS: Record<AttendanceEntry["eventType"], string> = {
@@ -31,7 +34,19 @@ export default function AttendanceDetailModal({
   entries: AttendanceEntry[];
   onClose: () => void;
 }) {
-  const sorted = [...entries].sort((a, b) => (a.eventDate < b.eventDate ? 1 : -1));
+  const [bearSlotFilter, setBearSlotFilter] = useState<number | "all">("all");
+
+  const bearSlots = useMemo(
+    () =>
+      [...new Set(entries.filter((e) => e.eventType === "bear" && e.bearSlot).map((e) => e.bearSlot!))].sort(
+        (a, b) => a - b
+      ),
+    [entries]
+  );
+
+  const sorted = [...entries]
+    .filter((e) => bearSlotFilter === "all" || e.bearSlot === bearSlotFilter)
+    .sort((a, b) => (a.eventDate < b.eventDate ? 1 : -1));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8">
@@ -49,11 +64,40 @@ export default function AttendanceDetailModal({
             ✕
           </button>
         </div>
+        {bearSlots.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 px-5 py-2.5">
+            <button
+              onClick={() => setBearSlotFilter("all")}
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                bearSlotFilter === "all"
+                  ? "border-teal-300 bg-teal-50 text-teal-700"
+                  : "border-slate-200 text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              All bears
+            </button>
+            {bearSlots.map((slot) => (
+              <button
+                key={slot}
+                onClick={() => setBearSlotFilter(slot)}
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                  bearSlotFilter === slot
+                    ? "border-teal-300 bg-teal-50 text-teal-700"
+                    : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                }`}
+              >
+                Bear {slot}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="max-h-[70vh] overflow-y-auto divide-y divide-slate-100 px-5 py-2">
           {sorted.map((e, i) => (
             <div key={i} className="flex items-center justify-between gap-2 py-3">
               <div>
-                <p className="text-sm font-semibold text-slate-900">{TYPE_LABELS[e.eventType]}</p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {e.eventType === "bear" && e.bearSlot ? `Bear ${e.bearSlot}` : TYPE_LABELS[e.eventType]}
+                </p>
                 <p className="text-xs text-slate-400">{formatDate(e.eventDate)}</p>
               </div>
               <span
