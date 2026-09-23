@@ -193,9 +193,19 @@ export async function bulkImportBearResults(orgId: string, eventId: string, rows
     for (const alias of m.aliases ?? []) byName.set(alias.toLowerCase(), m.id);
   }
 
-  const upserts = [];
+  // Keyed by member_id so duplicate rows for the same person (e.g. the same
+  // face appearing in two overlapping video frames) can't slip two rows with
+  // the same (event_id, member_id) into one upsert call — Postgres rejects
+  // an upsert that would affect the same row twice, silently failing the
+  // *entire* batch, which previously went unnoticed because the error was
+  // never checked.
+  const upsertsByMemberId = new Map<string, ReturnType<typeof buildUpsert>>();
   const unmatchedNames: string[] = [];
   const nameOverrides: { memberId: string; newName: string }[] = [];
+
+  function buildUpsert(memberId: string, score: number) {
+    return { org_id: orgId, event_id: eventId, member_id: memberId, status: "attended", signed_up: true, score };
+  }
 
   for (const row of rows) {
     let memberId: string | null | undefined = row.memberId && memberIds.has(row.memberId) ? row.memberId : null;
@@ -211,18 +221,16 @@ export async function bulkImportBearResults(orgId: string, eventId: string, rows
     if (row.manualMatch) {
       nameOverrides.push({ memberId, newName: row.nameOrChiefId.trim() });
     }
-    upserts.push({
-      org_id: orgId,
-      event_id: eventId,
-      member_id: memberId,
-      status: "attended",
-      signed_up: true,
-      score: row.score,
-    });
+    upsertsByMemberId.set(memberId, buildUpsert(memberId, row.score));
   }
 
+  const upserts = [...upsertsByMemberId.values()];
+
   if (upserts.length) {
-    await supabase.from("attendance").upsert(upserts, { onConflict: "event_id,member_id" });
+    const { error } = await supabase.from("attendance").upsert(upserts, { onConflict: "event_id,member_id" });
+    if (error) {
+      return { imported: 0, unmatched: rows.length, unmatchedNames: rows.map((r) => r.nameOrChiefId), error: error.message };
+    }
   }
   if (nameOverrides.length) {
     await applyNameOverrides(supabase, members ?? [], nameOverrides);
@@ -371,7 +379,9 @@ export async function bulkImportAttendance(
     for (const alias of m.aliases ?? []) byName.set(alias.toLowerCase(), m.id);
   }
 
-  const upserts = [];
+  // Keyed by member_id — see bulkImportBearResults for why duplicate rows for
+  // the same person must never reach a single upsert call.
+  const upsertsByMemberId = new Map<string, Record<string, unknown>>();
   const unmatchedNames: string[] = [];
   const nameOverrides: { memberId: string; newName: string }[] = [];
 
@@ -391,7 +401,7 @@ export async function bulkImportAttendance(
     }
     const arrived = row.arrived ?? false;
     const reason = row.reason?.trim() ?? "";
-    upserts.push({
+    upsertsByMemberId.set(memberId, {
       org_id: orgId,
       event_id: eventId,
       member_id: memberId,
@@ -403,8 +413,13 @@ export async function bulkImportAttendance(
     });
   }
 
+  const upserts = [...upsertsByMemberId.values()];
+
   if (upserts.length) {
-    await supabase.from("attendance").upsert(upserts, { onConflict: "event_id,member_id" });
+    const { error } = await supabase.from("attendance").upsert(upserts, { onConflict: "event_id,member_id" });
+    if (error) {
+      return { imported: 0, unmatched: rows.length, unmatchedNames: rows.map((r) => r.nameOrChiefId), error: error.message };
+    }
   }
   if (nameOverrides.length) {
     await applyNameOverrides(supabase, members ?? [], nameOverrides);

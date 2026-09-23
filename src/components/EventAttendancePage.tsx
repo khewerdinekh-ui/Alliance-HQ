@@ -320,6 +320,7 @@ export default async function EventAttendancePage({
         {isAdmin && activeEvent && (
           <div className="border-b border-slate-100 px-5 py-4">
             <AttendanceImportClient
+              key={`csv-${activeEvent.id}`}
               orgId={orgId}
               eventId={activeEvent.id}
               eventType={eventType}
@@ -331,6 +332,7 @@ export default async function EventAttendancePage({
               }))}
             />
             <ScreenshotImportClient
+              key={`ai-${activeEvent.id}`}
               orgId={orgId}
               eventId={activeEvent.id}
               eventType={eventType}

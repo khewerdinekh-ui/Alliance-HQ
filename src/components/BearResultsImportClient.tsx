@@ -76,6 +76,10 @@ export default function BearResultsImportClient({
     }));
     const result = await bulkImportBearResults(orgId, eventId, payload);
     setImporting(false);
+    if (result.error) {
+      setStatus(`Import failed: ${result.error}`);
+      return;
+    }
     setStatus(
       `Imported ${result.imported} row${result.imported === 1 ? "" : "s"}.` +
         (result.unmatched ? ` ${result.unmatched} skipped (no member picked or no valid score).` : "")

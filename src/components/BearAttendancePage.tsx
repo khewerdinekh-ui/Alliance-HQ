@@ -232,6 +232,7 @@ export default async function BearAttendancePage({ selectedEventId }: { selected
         {isAdmin && activeEvent && (
           <div className="border-b border-slate-100 px-5 py-4">
             <BearResultsImportClient
+              key={`csv-${activeEvent.id}`}
               orgId={orgId}
               eventId={activeEvent.id}
               members={(members ?? []).map((m) => ({
@@ -242,6 +243,7 @@ export default async function BearAttendancePage({ selectedEventId }: { selected
               }))}
             />
             <BearResultsScreenshotImportClient
+              key={`ai-${activeEvent.id}`}
               orgId={orgId}
               eventId={activeEvent.id}
               members={(members ?? []).map((m) => ({

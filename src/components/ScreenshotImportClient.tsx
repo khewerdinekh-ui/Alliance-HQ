@@ -112,6 +112,10 @@ export default function ScreenshotImportClient({
     }));
     const result = await bulkImportAttendance(orgId, eventId, eventType, payload);
     setImporting(false);
+    if (result.error) {
+      setStatus(`Import failed: ${result.error}`);
+      return;
+    }
     setStatus(
       `Imported ${result.imported} row${result.imported === 1 ? "" : "s"}.` +
         (result.unmatched ? ` ${result.unmatched} skipped (no member picked).` : "")
