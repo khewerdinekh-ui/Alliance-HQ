@@ -27,7 +27,7 @@ export default async function BearAttendancePage({ selectedEventId }: { selected
       .order("bear_slot", { ascending: true }),
     supabase
       .from("members")
-      .select("id, name")
+      .select("id, name, chief_id")
       .eq("org_id", orgId)
       .eq("status", "current")
       .order("name"),
@@ -231,8 +231,16 @@ export default async function BearAttendancePage({ selectedEventId }: { selected
 
         {isAdmin && activeEvent && (
           <div className="border-b border-slate-100 px-5 py-4">
-            <BearResultsImportClient orgId={orgId} eventId={activeEvent.id} />
-            <BearResultsScreenshotImportClient orgId={orgId} eventId={activeEvent.id} />
+            <BearResultsImportClient
+              orgId={orgId}
+              eventId={activeEvent.id}
+              members={(members ?? []).map((m) => ({ id: m.id, name: m.name, chiefId: m.chief_id }))}
+            />
+            <BearResultsScreenshotImportClient
+              orgId={orgId}
+              eventId={activeEvent.id}
+              members={(members ?? []).map((m) => ({ id: m.id, name: m.name, chiefId: m.chief_id }))}
+            />
           </div>
         )}
 

@@ -134,7 +134,13 @@ export async function removeBearResult(formData: FormData) {
   revalidatePath("/bear");
 }
 
-export type BearResultImportRow = { nameOrChiefId: string; score: number };
+export type BearResultImportRow = { nameOrChiefId: string; score: number; memberId?: string | null };
+
+// Strips a leading alliance tag like "[ICY]" so a roster name without the
+// tag still matches a screenshot/CSV name that includes it.
+function stripTag(name: string) {
+  return name.replace(/^\s*\[[^\]]+\]\s*/, "").trim();
+}
 
 export async function bulkImportBearResults(orgId: string, eventId: string, rows: BearResultImportRow[]) {
   const supabase = await createClient();
@@ -144,6 +150,7 @@ export async function bulkImportBearResults(orgId: string, eventId: string, rows
     .select("id, name, chief_id")
     .eq("org_id", orgId);
 
+  const memberIds = new Set((members ?? []).map((m) => m.id));
   const byChiefId = new Map((members ?? []).filter((m) => m.chief_id).map((m) => [m.chief_id!, m.id]));
   const byName = new Map((members ?? []).map((m) => [m.name.toLowerCase(), m.id]));
 
@@ -151,8 +158,12 @@ export async function bulkImportBearResults(orgId: string, eventId: string, rows
   const unmatchedNames: string[] = [];
 
   for (const row of rows) {
-    const key = row.nameOrChiefId.trim();
-    const memberId = byChiefId.get(key) ?? byName.get(key.toLowerCase());
+    let memberId: string | null | undefined = row.memberId && memberIds.has(row.memberId) ? row.memberId : null;
+    if (!memberId) {
+      const key = row.nameOrChiefId.trim();
+      memberId =
+        byChiefId.get(key) ?? byName.get(key.toLowerCase()) ?? byName.get(stripTag(key).toLowerCase());
+    }
     if (!memberId || !Number.isFinite(row.score)) {
       unmatchedNames.push(row.nameOrChiefId);
       continue;
@@ -288,6 +299,7 @@ export type AttendanceImportRow = {
   reason?: string;
   legion?: string;
   lineupRole?: "main" | "sub";
+  memberId?: string | null;
 };
 
 export async function bulkImportAttendance(
@@ -303,6 +315,7 @@ export async function bulkImportAttendance(
     .select("id, name, chief_id")
     .eq("org_id", orgId);
 
+  const memberIds = new Set((members ?? []).map((m) => m.id));
   const byChiefId = new Map((members ?? []).filter((m) => m.chief_id).map((m) => [m.chief_id!, m.id]));
   const byName = new Map((members ?? []).map((m) => [m.name.toLowerCase(), m.id]));
 
@@ -310,8 +323,12 @@ export async function bulkImportAttendance(
   const unmatchedNames: string[] = [];
 
   for (const row of rows) {
-    const key = row.nameOrChiefId.trim();
-    const memberId = byChiefId.get(key) ?? byName.get(key.toLowerCase());
+    let memberId: string | null | undefined = row.memberId && memberIds.has(row.memberId) ? row.memberId : null;
+    if (!memberId) {
+      const key = row.nameOrChiefId.trim();
+      memberId =
+        byChiefId.get(key) ?? byName.get(key.toLowerCase()) ?? byName.get(stripTag(key).toLowerCase());
+    }
     if (!memberId) {
       unmatchedNames.push(row.nameOrChiefId);
       continue;

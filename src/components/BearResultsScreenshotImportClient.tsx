@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { bulkImportBearResults, extractBearResultsScreenshot } from "@/app/(app)/events/actions";
 import { resizeImageDataUrl } from "@/lib/imageResize";
+import { guessMemberId, type MatchableMember } from "@/lib/memberMatch";
 
-type Row = { nameOrChiefId: string; score: number };
+type Row = { nameOrChiefId: string; score: number; memberId: string | null };
 
 // A slow AI extraction that never resolves would leave the UI stuck on
 // "Reading…" forever with no feedback — race it against a timeout instead.
@@ -87,9 +88,11 @@ function extractVideoFrames(file: File, frameCount = 4, maxDimension = 1000): Pr
 export default function BearResultsScreenshotImportClient({
   orgId,
   eventId,
+  members,
 }: {
   orgId: string;
   eventId: string;
+  members: MatchableMember[];
 }) {
   const router = useRouter();
   const [rows, setRows] = useState<Row[]>([]);
@@ -97,7 +100,6 @@ export default function BearResultsScreenshotImportClient({
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [unmatchedNames, setUnmatchedNames] = useState<string[]>([]);
 
   async function runExtraction(dataUrls: string[]) {
     setExtracting(true);
@@ -109,7 +111,9 @@ export default function BearResultsScreenshotImportClient({
         setError(result.error);
         return;
       }
-      setRows(result.rows);
+      setRows(
+        result.rows.map((r) => ({ ...r, memberId: guessMemberId(r.nameOrChiefId, members) }))
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed.");
     } finally {
@@ -163,9 +167,8 @@ export default function BearResultsScreenshotImportClient({
     setImporting(false);
     setStatus(
       `Imported ${result.imported} row${result.imported === 1 ? "" : "s"}.` +
-        (result.unmatched ? ` ${result.unmatched} didn't match a member.` : "")
+        (result.unmatched ? ` ${result.unmatched} skipped (no member picked or no valid score).` : "")
     );
-    setUnmatchedNames(result.unmatchedNames ?? []);
     setRows([]);
     router.refresh();
   }
@@ -199,26 +202,37 @@ export default function BearResultsScreenshotImportClient({
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-2 py-1.5">Name / Chief ID</th>
+                  <th className="px-2 py-1.5">AI read</th>
+                  <th className="px-2 py-1.5">Member</th>
                   <th className="px-2 py-1.5">Score</th>
                   <th className="px-2 py-1.5" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {rows.map((r, i) => (
-                  <tr key={i}>
+                  <tr key={i} className={r.memberId ? "" : "bg-red-50/60"}>
+                    <td className="px-2 py-1 text-slate-500">{r.nameOrChiefId}</td>
                     <td className="px-2 py-1">
-                      <input
-                        value={r.nameOrChiefId}
-                        onChange={(e) => updateRow(i, { nameOrChiefId: e.target.value })}
-                        className="w-32 rounded border border-slate-200 px-1.5 py-0.5"
-                      />
+                      <select
+                        value={r.memberId ?? ""}
+                        onChange={(e) => updateRow(i, { memberId: e.target.value || null })}
+                        className={`w-32 rounded border px-1.5 py-0.5 ${
+                          r.memberId ? "border-slate-200" : "border-red-300"
+                        }`}
+                      >
+                        <option value="">— no match —</option>
+                        {members.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-2 py-1">
                       <input
                         value={r.score}
                         onChange={(e) => updateRow(i, { score: Number(e.target.value) || 0 })}
-                        className="w-28 rounded border border-slate-200 px-1.5 py-0.5"
+                        className="w-24 rounded border border-slate-200 px-1.5 py-0.5"
                       />
                     </td>
                     <td className="px-2 py-1">
@@ -233,6 +247,7 @@ export default function BearResultsScreenshotImportClient({
             <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-3 py-2">
               <span className="text-[11px] text-slate-500">
                 {rows.length} row{rows.length === 1 ? "" : "s"} — review before importing
+                {rows.some((r) => !r.memberId) ? " (red rows need a member picked)" : ""}
               </span>
               <button
                 onClick={handleImport}
@@ -246,9 +261,6 @@ export default function BearResultsScreenshotImportClient({
         )}
 
         {status && <p className="text-xs text-slate-600">{status}</p>}
-        {unmatchedNames.length > 0 && (
-          <p className="text-xs text-red-600">Didn't match: {unmatchedNames.join(", ")}</p>
-        )}
       </div>
     </details>
   );

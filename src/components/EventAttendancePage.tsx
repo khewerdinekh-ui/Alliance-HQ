@@ -42,7 +42,7 @@ export default async function EventAttendancePage({
         .order("event_date", { ascending: false }),
       supabase
         .from("members")
-        .select("id, name")
+        .select("id, name, chief_id")
         .eq("org_id", orgId)
         .eq("status", "current")
         .order("name"),
@@ -319,8 +319,18 @@ export default async function EventAttendancePage({
 
         {isAdmin && activeEvent && (
           <div className="border-b border-slate-100 px-5 py-4">
-            <AttendanceImportClient orgId={orgId} eventId={activeEvent.id} eventType={eventType} />
-            <ScreenshotImportClient orgId={orgId} eventId={activeEvent.id} eventType={eventType} />
+            <AttendanceImportClient
+              orgId={orgId}
+              eventId={activeEvent.id}
+              eventType={eventType}
+              members={(members ?? []).map((m) => ({ id: m.id, name: m.name, chiefId: m.chief_id }))}
+            />
+            <ScreenshotImportClient
+              orgId={orgId}
+              eventId={activeEvent.id}
+              eventType={eventType}
+              members={(members ?? []).map((m) => ({ id: m.id, name: m.name, chiefId: m.chief_id }))}
+            />
           </div>
         )}
 
