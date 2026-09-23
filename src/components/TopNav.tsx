@@ -115,7 +115,7 @@ export default function TopNav({
         </div>
 
         <nav className="mt-4 flex flex-wrap gap-1 text-sm">
-          {LINKS.filter((l) => l.href !== "/admin" || membership.isAdmin).map((link) => {
+          {LINKS.filter((l) => l.href !== "/admin" || membership.allianceRank === "R5").map((link) => {
             const active = pathname === link.href;
             return (
               <Link

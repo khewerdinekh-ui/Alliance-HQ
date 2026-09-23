@@ -4,27 +4,45 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
 
-async function assertAdmin() {
+// The Admin page's own settings (ranks, promotions, removals, sub-alliances,
+// alliance name/state/password) are R5-only — "admin" (is_admin) only grants
+// import/edit access across Members/Foundry/Canyon/Bear, not this page.
+async function assertR5() {
   const membership = await requireMembership();
-  if (!membership.isAdmin) {
+  if (membership.allianceRank !== "R5") {
     throw new Error("Forbidden");
   }
   return membership;
 }
 
 export async function updateMemberRank(formData: FormData) {
-  await assertAdmin();
+  await assertR5();
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
   const rank = String(formData.get("rank") ?? "");
-  if (!id || !rank) return;
+  if (!id || !rank || rank === "R5") return;
 
   await supabase.from("org_members").update({ alliance_rank: rank }).eq("id", id);
   revalidatePath("/admin");
 }
 
+export async function transferR5(formData: FormData) {
+  const membership = await assertR5();
+  const supabase = await createClient();
+  const newR5MemberId = String(formData.get("id") ?? "");
+  if (!newR5MemberId) return;
+
+  const { error } = await supabase.rpc("transfer_r5", {
+    p_org_id: membership.orgId,
+    p_new_r5_member_id: newR5MemberId,
+  });
+  if (error) return;
+
+  revalidatePath("/admin");
+}
+
 export async function setMemberAdmin(formData: FormData) {
-  const membership = await assertAdmin();
+  const membership = await assertR5();
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
   const isAdmin = formData.get("isAdmin") === "true";
@@ -46,7 +64,7 @@ export async function setMemberAdmin(formData: FormData) {
 }
 
 export async function removeOrgMember(formData: FormData) {
-  const membership = await assertAdmin();
+  const membership = await assertR5();
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
@@ -73,7 +91,7 @@ export async function removeOrgMember(formData: FormData) {
 }
 
 export async function addSubAlliance(formData: FormData) {
-  const membership = await assertAdmin();
+  const membership = await assertR5();
   const supabase = await createClient();
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;
@@ -83,7 +101,7 @@ export async function addSubAlliance(formData: FormData) {
 }
 
 export async function deleteSubAlliance(formData: FormData) {
-  await assertAdmin();
+  await assertR5();
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
@@ -93,18 +111,22 @@ export async function deleteSubAlliance(formData: FormData) {
 }
 
 export async function updateOrgDetails(formData: FormData) {
-  const membership = await assertAdmin();
+  const membership = await assertR5();
   const supabase = await createClient();
   const name = String(formData.get("orgName") ?? "").trim();
   const state = String(formData.get("orgState") ?? "").trim();
   if (!name || !state) return;
 
-  await supabase.from("orgs").update({ name, state }).eq("id", membership.orgId);
+  await supabase.rpc("update_org_details", {
+    p_org_id: membership.orgId,
+    p_name: name,
+    p_state: state,
+  });
   revalidatePath("/admin");
 }
 
 export async function updateOrgPassword(_prevState: string | undefined, formData: FormData) {
-  const membership = await assertAdmin();
+  const membership = await assertR5();
   const newPassword = String(formData.get("newPassword") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
 

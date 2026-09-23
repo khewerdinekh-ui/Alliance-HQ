@@ -7,15 +7,16 @@ import {
   deleteSubAlliance,
   removeOrgMember,
   setMemberAdmin,
+  transferR5,
   updateMemberRank,
   updateOrgDetails,
 } from "./actions";
 
-const RANKS = ["R1", "R2", "R3", "R4", "R5"];
+const RANKS = ["R1", "R2", "R3", "R4"];
 
 export default async function AdminPage() {
   const membership = await requireMembership();
-  if (!membership.isAdmin) {
+  if (membership.allianceRank !== "R5") {
     redirect("/members");
   }
 
@@ -39,7 +40,8 @@ export default async function AdminPage() {
       <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-700">Admin</h2>
       <h1 className="mt-1 text-2xl font-semibold text-slate-900">Alliance settings.</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Manage sub-alliances and member roles. There must always be at least one admin.
+        Manage sub-alliances and member roles. This page is only visible to R5 — admins can import and
+        edit content, but only R5 can change roles, ranks, or alliance settings.
       </p>
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -115,6 +117,39 @@ export default async function AdminPage() {
         </div>
       </div>
 
+      <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-6 shadow-sm">
+        <h3 className="text-sm font-semibold text-amber-900">Transfer R5 leadership</h3>
+        <p className="mt-0.5 text-xs text-amber-700">
+          Hands R5 (and this Admin page) to someone else. You'll drop to R4 immediately — there's
+          always exactly one R5.
+        </p>
+        <form action={transferR5} className="mt-3 flex flex-wrap items-center gap-2">
+          <select
+            name="id"
+            required
+            defaultValue=""
+            className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm"
+          >
+            <option value="" disabled>
+              Select new R5
+            </option>
+            {orgMembers
+              ?.filter((m) => m.alliance_rank !== "R5")
+              .map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.display_name} ({m.chief_id})
+                </option>
+              ))}
+          </select>
+          <button
+            type="submit"
+            className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
+          >
+            Transfer R5
+          </button>
+        </form>
+      </div>
+
       <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-4 py-3">
           <h3 className="text-sm font-semibold text-slate-900">Members with access</h3>
@@ -137,21 +172,27 @@ export default async function AdminPage() {
                   <td className="px-4 py-2 font-medium text-slate-900">{m.display_name}</td>
                   <td className="px-4 py-2 text-slate-600">{m.chief_id}</td>
                   <td className="px-4 py-2">
-                    <form action={updateMemberRank} className="flex items-center gap-1">
-                      <input type="hidden" name="id" value={m.id} />
-                      <select
-                        name="rank"
-                        defaultValue={m.alliance_rank}
-                        className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
-                      >
-                        {RANKS.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                      </select>
-                      <button className="text-xs text-teal-700 hover:underline">Save</button>
-                    </form>
+                    {m.alliance_rank === "R5" ? (
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                        R5
+                      </span>
+                    ) : (
+                      <form action={updateMemberRank} className="flex items-center gap-1">
+                        <input type="hidden" name="id" value={m.id} />
+                        <select
+                          name="rank"
+                          defaultValue={m.alliance_rank}
+                          className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                        >
+                          {RANKS.map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                        <button className="text-xs text-teal-700 hover:underline">Save</button>
+                      </form>
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     {m.is_admin ? (
@@ -164,6 +205,10 @@ export default async function AdminPage() {
                   </td>
                   <td className="px-4 py-2 text-right">
                     <div className="flex justify-end gap-2">
+                      {m.alliance_rank === "R5" ? (
+                        <span className="text-xs text-slate-400">Transfer R5 to change</span>
+                      ) : (
+                        <>
                       {m.is_admin ? (
                         <form action={setMemberAdmin}>
                           <input type="hidden" name="id" value={m.id} />
@@ -195,6 +240,8 @@ export default async function AdminPage() {
                           Remove
                         </button>
                       </form>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
