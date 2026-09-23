@@ -157,17 +157,20 @@ async function applyNameOverrides(
   overrides: { memberId: string; newName: string }[]
 ) {
   const memberById = new Map(members.map((m) => [m.id, m]));
-  for (const { memberId, newName } of overrides) {
+  for (const { memberId, newName: rawNewName } of overrides) {
     const member = memberById.get(memberId);
+    // Alliance tags like "[ICY]"/"[ICX]" are never part of the stored name.
+    const newName = stripTag(rawNewName);
     if (!member || !newName || newName === member.name) continue;
 
-    const aliases = member.aliases.includes(member.name)
-      ? member.aliases
-      : [...member.aliases, member.name];
+    const aliases = new Set(member.aliases);
+    aliases.add(member.name);
+    if (rawNewName.trim() !== newName) aliases.add(rawNewName.trim());
+    aliases.delete(newName);
 
     await supabase
       .from("members")
-      .update({ name: newName, aliases })
+      .update({ name: newName, aliases: [...aliases] })
       .eq("id", memberId);
   }
 }
