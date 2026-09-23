@@ -134,7 +134,12 @@ export async function removeBearResult(formData: FormData) {
   revalidatePath("/bear");
 }
 
-export type BearResultImportRow = { nameOrChiefId: string; score: number; memberId?: string | null };
+export type BearResultImportRow = {
+  nameOrChiefId: string;
+  score: number;
+  memberId?: string | null;
+  manualMatch?: boolean;
+};
 
 // Strips a leading alliance tag like "[ICY]" so a roster name without the
 // tag still matches a screenshot/CSV name that includes it.
@@ -142,20 +147,52 @@ function stripTag(name: string) {
   return name.replace(/^\s*\[[^\]]+\]\s*/, "").trim();
 }
 
+// When an admin manually corrects a name match (the row didn't auto-match,
+// or they picked someone other than the guess), the imported text becomes
+// that member's new name and their old name is kept as an alias — this is
+// how in-game name changes get picked up going forward.
+async function applyNameOverrides(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  members: { id: string; name: string; aliases: string[] }[],
+  overrides: { memberId: string; newName: string }[]
+) {
+  const memberById = new Map(members.map((m) => [m.id, m]));
+  for (const { memberId, newName } of overrides) {
+    const member = memberById.get(memberId);
+    if (!member || !newName || newName === member.name) continue;
+
+    const aliases = member.aliases.includes(member.name)
+      ? member.aliases
+      : [...member.aliases, member.name];
+
+    await supabase
+      .from("members")
+      .update({ name: newName, aliases })
+      .eq("id", memberId);
+  }
+}
+
 export async function bulkImportBearResults(orgId: string, eventId: string, rows: BearResultImportRow[]) {
   const supabase = await createClient();
 
   const { data: members } = await supabase
     .from("members")
-    .select("id, name, chief_id")
+    .select("id, name, chief_id, aliases")
     .eq("org_id", orgId);
 
   const memberIds = new Set((members ?? []).map((m) => m.id));
   const byChiefId = new Map((members ?? []).filter((m) => m.chief_id).map((m) => [m.chief_id!, m.id]));
-  const byName = new Map((members ?? []).map((m) => [m.name.toLowerCase(), m.id]));
+  // Match against the current name OR any previous name (alias) — a renamed
+  // player's old screenshots/CSVs still resolve correctly.
+  const byName = new Map<string, string>();
+  for (const m of members ?? []) {
+    byName.set(m.name.toLowerCase(), m.id);
+    for (const alias of m.aliases ?? []) byName.set(alias.toLowerCase(), m.id);
+  }
 
   const upserts = [];
   const unmatchedNames: string[] = [];
+  const nameOverrides: { memberId: string; newName: string }[] = [];
 
   for (const row of rows) {
     let memberId: string | null | undefined = row.memberId && memberIds.has(row.memberId) ? row.memberId : null;
@@ -167,6 +204,9 @@ export async function bulkImportBearResults(orgId: string, eventId: string, rows
     if (!memberId || !Number.isFinite(row.score)) {
       unmatchedNames.push(row.nameOrChiefId);
       continue;
+    }
+    if (row.manualMatch) {
+      nameOverrides.push({ memberId, newName: row.nameOrChiefId.trim() });
     }
     upserts.push({
       org_id: orgId,
@@ -181,8 +221,12 @@ export async function bulkImportBearResults(orgId: string, eventId: string, rows
   if (upserts.length) {
     await supabase.from("attendance").upsert(upserts, { onConflict: "event_id,member_id" });
   }
+  if (nameOverrides.length) {
+    await applyNameOverrides(supabase, members ?? [], nameOverrides);
+  }
 
   revalidatePath("/bear");
+  revalidatePath("/members");
   return { imported: upserts.length, unmatched: unmatchedNames.length, unmatchedNames };
 }
 
@@ -300,6 +344,7 @@ export type AttendanceImportRow = {
   legion?: string;
   lineupRole?: "main" | "sub";
   memberId?: string | null;
+  manualMatch?: boolean;
 };
 
 export async function bulkImportAttendance(
@@ -312,15 +357,20 @@ export async function bulkImportAttendance(
 
   const { data: members } = await supabase
     .from("members")
-    .select("id, name, chief_id")
+    .select("id, name, chief_id, aliases")
     .eq("org_id", orgId);
 
   const memberIds = new Set((members ?? []).map((m) => m.id));
   const byChiefId = new Map((members ?? []).filter((m) => m.chief_id).map((m) => [m.chief_id!, m.id]));
-  const byName = new Map((members ?? []).map((m) => [m.name.toLowerCase(), m.id]));
+  const byName = new Map<string, string>();
+  for (const m of members ?? []) {
+    byName.set(m.name.toLowerCase(), m.id);
+    for (const alias of m.aliases ?? []) byName.set(alias.toLowerCase(), m.id);
+  }
 
   const upserts = [];
   const unmatchedNames: string[] = [];
+  const nameOverrides: { memberId: string; newName: string }[] = [];
 
   for (const row of rows) {
     let memberId: string | null | undefined = row.memberId && memberIds.has(row.memberId) ? row.memberId : null;
@@ -332,6 +382,9 @@ export async function bulkImportAttendance(
     if (!memberId) {
       unmatchedNames.push(row.nameOrChiefId);
       continue;
+    }
+    if (row.manualMatch) {
+      nameOverrides.push({ memberId, newName: row.nameOrChiefId.trim() });
     }
     const arrived = row.arrived ?? false;
     const reason = row.reason?.trim() ?? "";
@@ -350,7 +403,11 @@ export async function bulkImportAttendance(
   if (upserts.length) {
     await supabase.from("attendance").upsert(upserts, { onConflict: "event_id,member_id" });
   }
+  if (nameOverrides.length) {
+    await applyNameOverrides(supabase, members ?? [], nameOverrides);
+  }
 
   revalidatePath(`/${eventType}`);
+  revalidatePath("/members");
   return { imported: upserts.length, unmatched: unmatchedNames.length, unmatchedNames };
 }

@@ -34,6 +34,8 @@ function parseCsv(text: string): AttendanceImportRow[] {
   });
 }
 
+type Row = AttendanceImportRow & { guessedMemberId?: string | null };
+
 export default function AttendanceImportClient({
   orgId,
   eventId,
@@ -46,7 +48,7 @@ export default function AttendanceImportClient({
   members: MatchableMember[];
 }) {
   const router = useRouter();
-  const [rows, setRows] = useState<AttendanceImportRow[]>([]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
 
@@ -56,13 +58,18 @@ export default function AttendanceImportClient({
     const reader = new FileReader();
     reader.onload = () => {
       const parsed = parseCsv(String(reader.result ?? ""));
-      setRows(parsed.map((r) => ({ ...r, memberId: guessMemberId(r.nameOrChiefId, members) })));
+      setRows(
+        parsed.map((r) => {
+          const guessedMemberId = guessMemberId(r.nameOrChiefId, members);
+          return { ...r, memberId: guessedMemberId, guessedMemberId };
+        })
+      );
       setStatus(null);
     };
     reader.readAsText(file);
   }
 
-  function updateRow(i: number, patch: Partial<AttendanceImportRow>) {
+  function updateRow(i: number, patch: Partial<Row>) {
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   }
 
@@ -72,7 +79,11 @@ export default function AttendanceImportClient({
 
   async function handleImport() {
     setImporting(true);
-    const result = await bulkImportAttendance(orgId, eventId, eventType, rows);
+    const payload = rows.map((r) => ({
+      ...r,
+      manualMatch: r.memberId !== r.guessedMemberId,
+    }));
+    const result = await bulkImportAttendance(orgId, eventId, eventType, payload);
     setImporting(false);
     setStatus(
       `Imported ${result.imported} row${result.imported === 1 ? "" : "s"}.` +

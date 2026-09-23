@@ -42,7 +42,7 @@ export default async function EventAttendancePage({
         .order("event_date", { ascending: false }),
       supabase
         .from("members")
-        .select("id, name, chief_id")
+        .select("id, name, chief_id, aliases")
         .eq("org_id", orgId)
         .eq("status", "current")
         .order("name"),
@@ -323,13 +323,23 @@ export default async function EventAttendancePage({
               orgId={orgId}
               eventId={activeEvent.id}
               eventType={eventType}
-              members={(members ?? []).map((m) => ({ id: m.id, name: m.name, chiefId: m.chief_id }))}
+              members={(members ?? []).map((m) => ({
+                id: m.id,
+                name: m.name,
+                chiefId: m.chief_id,
+                aliases: m.aliases,
+              }))}
             />
             <ScreenshotImportClient
               orgId={orgId}
               eventId={activeEvent.id}
               eventType={eventType}
-              members={(members ?? []).map((m) => ({ id: m.id, name: m.name, chiefId: m.chief_id }))}
+              members={(members ?? []).map((m) => ({
+                id: m.id,
+                name: m.name,
+                chiefId: m.chief_id,
+                aliases: m.aliases,
+              }))}
             />
           </div>
         )}

@@ -16,6 +16,7 @@ type Row = {
   arrived: boolean;
   reason: string;
   memberId: string | null;
+  guessedMemberId: string | null;
 };
 
 // A slow AI extraction that never resolves would leave the UI stuck on
@@ -82,7 +83,12 @@ export default function ScreenshotImportClient({
         setError(result.error);
         return;
       }
-      setRows(result.rows.map((r) => ({ ...r, memberId: guessMemberId(r.nameOrChiefId, members) })));
+      setRows(
+        result.rows.map((r) => {
+          const guessedMemberId = guessMemberId(r.nameOrChiefId, members);
+          return { ...r, memberId: guessedMemberId, guessedMemberId };
+        })
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed.");
     } finally {
@@ -100,7 +106,11 @@ export default function ScreenshotImportClient({
 
   async function handleImport() {
     setImporting(true);
-    const result = await bulkImportAttendance(orgId, eventId, eventType, rows);
+    const payload = rows.map((r) => ({
+      ...r,
+      manualMatch: r.memberId !== r.guessedMemberId,
+    }));
+    const result = await bulkImportAttendance(orgId, eventId, eventType, payload);
     setImporting(false);
     setStatus(
       `Imported ${result.imported} row${result.imported === 1 ? "" : "s"}.` +

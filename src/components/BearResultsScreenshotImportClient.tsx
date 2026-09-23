@@ -6,7 +6,7 @@ import { bulkImportBearResults, extractBearResultsScreenshot } from "@/app/(app)
 import { resizeImageDataUrl } from "@/lib/imageResize";
 import { guessMemberId, type MatchableMember } from "@/lib/memberMatch";
 
-type Row = { nameOrChiefId: string; score: number; memberId: string | null };
+type Row = { nameOrChiefId: string; score: number; memberId: string | null; guessedMemberId: string | null };
 
 // A slow AI extraction that never resolves would leave the UI stuck on
 // "Reading…" forever with no feedback — race it against a timeout instead.
@@ -112,7 +112,10 @@ export default function BearResultsScreenshotImportClient({
         return;
       }
       setRows(
-        result.rows.map((r) => ({ ...r, memberId: guessMemberId(r.nameOrChiefId, members) }))
+        result.rows.map((r) => {
+          const guessedMemberId = guessMemberId(r.nameOrChiefId, members);
+          return { ...r, memberId: guessedMemberId, guessedMemberId };
+        })
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed.");
@@ -163,7 +166,11 @@ export default function BearResultsScreenshotImportClient({
 
   async function handleImport() {
     setImporting(true);
-    const result = await bulkImportBearResults(orgId, eventId, rows);
+    const payload = rows.map((r) => ({
+      ...r,
+      manualMatch: r.memberId !== r.guessedMemberId,
+    }));
+    const result = await bulkImportBearResults(orgId, eventId, payload);
     setImporting(false);
     setStatus(
       `Imported ${result.imported} row${result.imported === 1 ? "" : "s"}.` +
