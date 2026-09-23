@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { signOut } from "@/app/(app)/actions";
 import type { Membership } from "@/lib/membership";
 import type { Locale } from "@/lib/i18n/locales";
@@ -24,17 +25,26 @@ export default function TopNav({
   membership,
   initialLocale,
   isOwner,
-  unreadMessages,
-  newMembers,
 }: {
   membership: Membership;
   initialLocale: Locale;
   isOwner: boolean;
-  unreadMessages: number;
-  newMembers: number;
 }) {
   const pathname = usePathname();
   const { t } = useTranslations(initialLocale);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [newMembers, setNewMembers] = useState(0);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    fetch("/api/owner/counts")
+      .then((r) => r.json())
+      .then((data) => {
+        setUnreadMessages(data.unreadMessages ?? 0);
+        setNewMembers(data.newMembers ?? 0);
+      })
+      .catch(() => {});
+  }, [isOwner]);
 
   return (
     <header className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 text-white shadow-md">
