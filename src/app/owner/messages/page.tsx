@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { hasOwnerSession } from "@/lib/ownerAuth";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -20,7 +21,14 @@ export default async function OwnerMessagesPage() {
   return (
     <div className="min-h-screen bg-slate-100 px-4 py-10">
       <div className="mx-auto max-w-2xl">
-        <div className="flex items-start justify-between">
+        <Link
+          href="/members"
+          className="inline-flex items-center gap-1 text-sm font-medium text-teal-700 hover:underline"
+        >
+          ← Back to ICX
+        </Link>
+
+        <div className="mt-3 flex items-start justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Site owner</p>
             <h1 className="mt-1 text-2xl font-semibold text-slate-900">Contact messages.</h1>
