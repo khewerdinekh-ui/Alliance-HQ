@@ -23,9 +23,11 @@ const LINKS: { href: string; key: Parameters<ReturnType<typeof useTranslations>[
 export default function TopNav({
   membership,
   initialLocale,
+  isOwner,
 }: {
   membership: Membership;
   initialLocale: Locale;
+  isOwner: boolean;
 }) {
   const pathname = usePathname();
   const { t } = useTranslations(initialLocale);
@@ -64,6 +66,17 @@ export default function TopNav({
             </div>
           </div>
           <div className="flex items-center gap-3 text-sm">
+            {isOwner && (
+              <Link
+                href="/owner/messages"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden items-center gap-1 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-amber-200 transition hover:bg-amber-500/20 sm:inline-flex"
+                title="Opens in a new tab — separate from your alliance session"
+              >
+                ✉️ Owner inbox
+              </Link>
+            )}
             <LanguageSwitcher initialLocale={initialLocale} />
             <span className="hidden text-slate-200 sm:inline">
               {membership.displayName} — {membership.allianceRank}
