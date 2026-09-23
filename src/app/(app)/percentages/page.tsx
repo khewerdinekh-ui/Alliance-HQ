@@ -39,9 +39,11 @@ export default async function PercentagesPage() {
   const { data: attendance } = eventIds.length
     ? await supabase
         .from("attendance")
-        .select("event_id, member_id, status")
+        .select("event_id, member_id, status, signed_up")
         .in("event_id", eventIds)
-    : { data: [] as { event_id: string; member_id: string; status: string }[] };
+    : {
+        data: [] as { event_id: string; member_id: string; status: string; signed_up: boolean }[],
+      };
 
   // Bear runs 4 slots per date, but all 4 count as ONE event: fold every Bear
   // event id on the same date into a single "unit" for both the denominators
@@ -71,16 +73,29 @@ export default async function PercentagesPage() {
   const totalEvents = eventsByType.foundry + eventsByType.canyon + eventsByType.bear;
 
   // Per member per unit, keep the best status across that unit's slot(s):
-  // attended beats excused beats no_show (so one attended Bear slot marks the
-  // whole day attended, matching the alliance's "1/1 not 1/4" rule).
-  const statusPriority = { attended: 3, excused: 2, no_show: 1 } as const;
-  const memberUnitStatus = new Map<string, Map<string, AttendanceEntry["status"]>>();
+  // attended beats excused beats a real (signed-up) no_show beats simply
+  // never having signed up at all — so one attended Bear slot marks the
+  // whole day attended, and someone who never signed up isn't counted as an
+  // unexcused no-show (matching one signed_up=true attendance row).
+  type EffectiveStatus = "attended" | "excused" | "no_show" | "not_signed_up";
+  const statusPriority: Record<EffectiveStatus, number> = {
+    attended: 4,
+    excused: 3,
+    no_show: 2,
+    not_signed_up: 1,
+  };
+  function effectiveStatus(status: string, signedUp: boolean): EffectiveStatus {
+    if (status === "no_show" && !signedUp) return "not_signed_up";
+    return status as EffectiveStatus;
+  }
+
+  const memberUnitStatus = new Map<string, Map<string, EffectiveStatus>>();
   for (const row of attendance ?? []) {
     const unitKey = unitByEventId.get(row.event_id);
     if (!unitKey) continue;
     if (!memberUnitStatus.has(row.member_id)) memberUnitStatus.set(row.member_id, new Map());
     const memberUnits = memberUnitStatus.get(row.member_id)!;
-    const status = row.status as AttendanceEntry["status"];
+    const status = effectiveStatus(row.status, row.signed_up);
     const existing = memberUnits.get(unitKey);
     if (!existing || statusPriority[status] > statusPriority[existing]) {
       memberUnits.set(unitKey, status);
@@ -91,9 +106,9 @@ export default async function PercentagesPage() {
     members?.map((m) => [
       m.id,
       {
-        foundry: { attended: 0, excused: 0, noShow: 0 },
-        canyon: { attended: 0, excused: 0, noShow: 0 },
-        bear: { attended: 0, excused: 0, noShow: 0 },
+        foundry: { attended: 0, excused: 0, noShow: 0, notSignedUp: 0 },
+        canyon: { attended: 0, excused: 0, noShow: 0, notSignedUp: 0 },
+        bear: { attended: 0, excused: 0, noShow: 0, notSignedUp: 0 },
         events: [] as AttendanceEntry[],
       },
     ])
@@ -108,7 +123,8 @@ export default async function PercentagesPage() {
       const bucket = memberStats[info.type];
       if (status === "attended") bucket.attended += 1;
       else if (status === "excused") bucket.excused += 1;
-      else bucket.noShow += 1;
+      else if (status === "no_show") bucket.noShow += 1;
+      else bucket.notSignedUp += 1;
     }
   }
 
@@ -124,6 +140,7 @@ export default async function PercentagesPage() {
       eventDate: info.eventDate,
       status: row.status as AttendanceEntry["status"],
       bearSlot: info.bearSlot,
+      signedUp: row.signed_up,
     });
   }
 
@@ -141,7 +158,8 @@ export default async function PercentagesPage() {
     const overallPct = pct(totalAttended, totalEvents);
     const totalExcused = s.foundry.excused + s.canyon.excused + s.bear.excused;
     const totalNoShow = s.foundry.noShow + s.canyon.noShow + s.bear.noShow;
-    const noShowPct = pct(totalNoShow, totalEvents - totalExcused);
+    const totalNotSignedUp = s.foundry.notSignedUp + s.canyon.notSignedUp + s.bear.notSignedUp;
+    const noShowPct = pct(totalNoShow, totalEvents - totalExcused - totalNotSignedUp);
 
     return {
       id: m.id,

@@ -7,6 +7,7 @@ export type AttendanceEntry = {
   eventDate: string;
   status: "attended" | "excused" | "no_show";
   bearSlot?: number | null;
+  signedUp?: boolean;
 };
 
 const TYPE_LABELS: Record<AttendanceEntry["eventType"], string> = {

@@ -192,7 +192,7 @@ export default function PercentagesTable({
                     openDetail(
                       m,
                       "Unexcused no-shows",
-                      (e) => e.status === "no_show",
+                      (e) => e.status === "no_show" && e.signedUp !== false,
                       "Events where they signed up, did not attend, and no accepted reason was recorded."
                     )
                   }
