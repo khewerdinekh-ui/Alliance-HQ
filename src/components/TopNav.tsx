@@ -24,10 +24,12 @@ export default function TopNav({
   membership,
   initialLocale,
   isOwner,
+  unreadMessages,
 }: {
   membership: Membership;
   initialLocale: Locale;
   isOwner: boolean;
+  unreadMessages: number;
 }) {
   const pathname = usePathname();
   const { t } = useTranslations(initialLocale);
@@ -71,10 +73,15 @@ export default function TopNav({
                 href="/owner/messages"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden items-center gap-1 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-amber-200 transition hover:bg-amber-500/20 sm:inline-flex"
+                className="relative hidden items-center gap-1 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-amber-200 transition hover:bg-amber-500/20 sm:inline-flex"
                 title="Opens in a new tab — separate from your alliance session"
               >
                 ✉️ Owner inbox
+                {unreadMessages > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
+                    {unreadMessages}
+                  </span>
+                )}
               </Link>
             )}
             <LanguageSwitcher initialLocale={initialLocale} />
