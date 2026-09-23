@@ -40,6 +40,7 @@ export default function ScreenshotImportClient({
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [unmatchedNames, setUnmatchedNames] = useState<string[]>([]);
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -77,8 +78,9 @@ export default function ScreenshotImportClient({
     setImporting(false);
     setStatus(
       `Imported ${result.imported} row${result.imported === 1 ? "" : "s"}.` +
-        (result.unmatched ? ` ${result.unmatched} name/Chief ID didn't match a member.` : "")
+        (result.unmatched ? ` ${result.unmatched} didn't match a member.` : "")
     );
+    setUnmatchedNames(result.unmatchedNames ?? []);
     setRows([]);
     setImages([]);
     router.refresh();
@@ -182,6 +184,9 @@ export default function ScreenshotImportClient({
         )}
 
         {status && <p className="text-xs text-slate-600">{status}</p>}
+        {unmatchedNames.length > 0 && (
+          <p className="text-xs text-red-600">Didn't match: {unmatchedNames.join(", ")}</p>
+        )}
       </div>
     </details>
   );

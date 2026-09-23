@@ -30,6 +30,7 @@ export default function BearResultsImportClient({ orgId, eventId }: { orgId: str
   const router = useRouter();
   const [rows, setRows] = useState<BearResultImportRow[]>([]);
   const [status, setStatus] = useState<string | null>(null);
+  const [unmatchedNames, setUnmatchedNames] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -49,8 +50,9 @@ export default function BearResultsImportClient({ orgId, eventId }: { orgId: str
     setImporting(false);
     setStatus(
       `Imported ${result.imported} row${result.imported === 1 ? "" : "s"}.` +
-        (result.unmatched ? ` ${result.unmatched} row(s) didn't match a member or score.` : "")
+        (result.unmatched ? ` ${result.unmatched} didn't match a member or had no valid score.` : "")
     );
+    setUnmatchedNames(result.unmatchedNames ?? []);
     setRows([]);
     router.refresh();
   }
@@ -80,6 +82,9 @@ export default function BearResultsImportClient({ orgId, eventId }: { orgId: str
         )}
 
         {status && <p className="text-xs text-slate-600">{status}</p>}
+        {unmatchedNames.length > 0 && (
+          <p className="text-xs text-red-600">Didn't match: {unmatchedNames.join(", ")}</p>
+        )}
       </div>
     </details>
   );

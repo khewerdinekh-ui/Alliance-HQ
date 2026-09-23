@@ -148,13 +148,13 @@ export async function bulkImportBearResults(orgId: string, eventId: string, rows
   const byName = new Map((members ?? []).map((m) => [m.name.toLowerCase(), m.id]));
 
   const upserts = [];
-  let unmatched = 0;
+  const unmatchedNames: string[] = [];
 
   for (const row of rows) {
     const key = row.nameOrChiefId.trim();
     const memberId = byChiefId.get(key) ?? byName.get(key.toLowerCase());
     if (!memberId || !Number.isFinite(row.score)) {
-      unmatched += 1;
+      unmatchedNames.push(row.nameOrChiefId);
       continue;
     }
     upserts.push({
@@ -172,7 +172,7 @@ export async function bulkImportBearResults(orgId: string, eventId: string, rows
   }
 
   revalidatePath("/bear");
-  return { imported: upserts.length, unmatched };
+  return { imported: upserts.length, unmatched: unmatchedNames.length, unmatchedNames };
 }
 
 export type AttendanceFieldUpdate = {
@@ -307,13 +307,13 @@ export async function bulkImportAttendance(
   const byName = new Map((members ?? []).map((m) => [m.name.toLowerCase(), m.id]));
 
   const upserts = [];
-  let unmatched = 0;
+  const unmatchedNames: string[] = [];
 
   for (const row of rows) {
     const key = row.nameOrChiefId.trim();
     const memberId = byChiefId.get(key) ?? byName.get(key.toLowerCase());
     if (!memberId) {
-      unmatched += 1;
+      unmatchedNames.push(row.nameOrChiefId);
       continue;
     }
     const arrived = row.arrived ?? false;
@@ -335,5 +335,5 @@ export async function bulkImportAttendance(
   }
 
   revalidatePath(`/${eventType}`);
-  return { imported: upserts.length, unmatched };
+  return { imported: upserts.length, unmatched: unmatchedNames.length, unmatchedNames };
 }
