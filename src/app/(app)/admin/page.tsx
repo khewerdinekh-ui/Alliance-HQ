@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
+import ChangeAlliancePasswordForm from "@/components/ChangeAlliancePasswordForm";
 import {
   addSubAlliance,
   deleteSubAlliance,
@@ -69,6 +70,14 @@ export default async function AdminPage() {
             Save
           </button>
         </form>
+
+        <div className="mt-5 border-t border-slate-100 pt-5">
+          <h3 className="text-sm font-semibold text-slate-900">Alliance password</h3>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Everyone signs in with this shared password — changing it doesn't affect Chief IDs or ranks.
+          </p>
+          <ChangeAlliancePasswordForm />
+        </div>
       </div>
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

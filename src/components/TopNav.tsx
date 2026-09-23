@@ -25,11 +25,13 @@ export default function TopNav({
   initialLocale,
   isOwner,
   unreadMessages,
+  newMembers,
 }: {
   membership: Membership;
   initialLocale: Locale;
   isOwner: boolean;
   unreadMessages: number;
+  newMembers: number;
 }) {
   const pathname = usePathname();
   const { t } = useTranslations(initialLocale);
@@ -80,6 +82,22 @@ export default function TopNav({
                 {unreadMessages > 0 && (
                   <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
                     {unreadMessages}
+                  </span>
+                )}
+              </Link>
+            )}
+            {isOwner && (
+              <Link
+                href="/owner/members"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative hidden items-center gap-1 rounded-lg border border-teal-400/30 bg-teal-500/10 px-3 py-1.5 text-teal-200 transition hover:bg-teal-500/20 sm:inline-flex"
+                title="Opens in a new tab — separate from your alliance session"
+              >
+                🆕 New members
+                {newMembers > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
+                    {newMembers}
                   </span>
                 )}
               </Link>

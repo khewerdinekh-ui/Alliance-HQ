@@ -102,3 +102,25 @@ export async function updateOrgDetails(formData: FormData) {
   await supabase.from("orgs").update({ name, state }).eq("id", membership.orgId);
   revalidatePath("/admin");
 }
+
+export async function updateOrgPassword(_prevState: string | undefined, formData: FormData) {
+  const membership = await assertAdmin();
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  if (newPassword !== confirmPassword) {
+    return "Passwords don't match.";
+  }
+  if (newPassword.length < 8) {
+    return "Alliance password must be at least 8 characters.";
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("update_org_password", {
+    p_org_id: membership.orgId,
+    p_new_password: newPassword,
+  });
+
+  if (error) return error.message;
+  return "updated";
+}

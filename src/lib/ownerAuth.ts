@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 // ID + shared password) and from any alliance's admin flag. No DB row, no
 // alliance membership — just a signed cookie checked against env secrets.
 const COOKIE_NAME = "owner_session";
+const MEMBERS_SEEN_COOKIE = "owner_members_seen_at";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
 function sign(payload: string) {
@@ -20,6 +21,34 @@ export async function createOwnerSession() {
 
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: MAX_AGE_SECONDS,
+  });
+
+  // First-ever login: baseline "seen" to now so existing members don't all
+  // show up as "new" — only members who join after this count going forward.
+  if (!cookieStore.get(MEMBERS_SEEN_COOKIE)) {
+    cookieStore.set(MEMBERS_SEEN_COOKIE, new Date().toISOString(), {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: MAX_AGE_SECONDS,
+    });
+  }
+}
+
+export async function getMembersSeenAt(): Promise<string> {
+  const cookieStore = await cookies();
+  return cookieStore.get(MEMBERS_SEEN_COOKIE)?.value ?? new Date(0).toISOString();
+}
+
+export async function markMembersSeen() {
+  const cookieStore = await cookies();
+  cookieStore.set(MEMBERS_SEEN_COOKIE, new Date().toISOString(), {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
