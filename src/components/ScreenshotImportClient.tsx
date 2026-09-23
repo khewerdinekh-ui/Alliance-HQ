@@ -7,6 +7,7 @@ import {
   extractAttendanceScreenshot,
   type EventType,
 } from "@/app/(app)/events/actions";
+import { resizeImageDataUrl } from "@/lib/imageResize";
 
 type Row = {
   nameOrChiefId: string;
@@ -15,12 +16,25 @@ type Row = {
   reason: string;
 };
 
-function fileToDataUrl(file: File): Promise<string> {
+// A slow AI extraction that never resolves would leave the UI stuck on
+// "Reading…" forever with no feedback — race it against a timeout instead.
+const EXTRACT_TIMEOUT_MS = 45000;
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    const timer = setTimeout(
+      () => reject(new Error("This is taking too long. Try fewer screenshots or check your connection.")),
+      ms
+    );
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      }
+    );
   });
 }
 
@@ -45,23 +59,32 @@ export default function ScreenshotImportClient({
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
-    const dataUrls = await Promise.all(files.map(fileToDataUrl));
-    setImages(dataUrls);
-    setRows([]);
     setError(null);
     setStatus(null);
+    try {
+      const dataUrls = await Promise.all(files.map((f) => resizeImageDataUrl(f)));
+      setImages(dataUrls);
+      setRows([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't read that image.");
+    }
   }
 
   async function handleExtract() {
     setExtracting(true);
     setError(null);
-    const result = await extractAttendanceScreenshot(images);
-    setExtracting(false);
-    if (result.error) {
-      setError(result.error);
-      return;
+    try {
+      const result = await withTimeout(extractAttendanceScreenshot(images), EXTRACT_TIMEOUT_MS);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setRows(result.rows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Extraction failed.");
+    } finally {
+      setExtracting(false);
     }
-    setRows(result.rows);
   }
 
   function updateRow(i: number, patch: Partial<Row>) {

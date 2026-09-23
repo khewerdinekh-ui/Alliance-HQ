@@ -3,21 +3,37 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { bulkImportBearResults, extractBearResultsScreenshot } from "@/app/(app)/events/actions";
+import { resizeImageDataUrl } from "@/lib/imageResize";
 
 type Row = { nameOrChiefId: string; score: number };
 
-function fileToDataUrl(file: File): Promise<string> {
+// A slow AI extraction that never resolves would leave the UI stuck on
+// "Reading…" forever with no feedback — race it against a timeout instead.
+const EXTRACT_TIMEOUT_MS = 45000;
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    const timer = setTimeout(
+      () => reject(new Error("This is taking too long. Try fewer photos, a shorter video, or check your connection.")),
+      ms
+    );
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      }
+    );
   });
 }
 
-// Grabs a handful of evenly-spaced frames from a video file as JPEG data URLs,
-// so the same vision extraction used for screenshots can read them.
-function extractVideoFrames(file: File, frameCount = 6): Promise<string[]> {
+// Grabs a handful of evenly-spaced, downscaled frames from a video file as
+// JPEG data URLs — smaller frames mean a faster upload and a faster vision
+// model response, so the same extraction used for screenshots can read them
+// without "ages" of waiting.
+function extractVideoFrames(file: File, frameCount = 4, maxDimension = 1000): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     video.preload = "auto";
@@ -30,9 +46,16 @@ function extractVideoFrames(file: File, frameCount = 6): Promise<string[]> {
     video.onerror = () => reject(new Error("Couldn't read that video file."));
 
     video.onloadedmetadata = () => {
+      let width = video.videoWidth;
+      let height = video.videoHeight;
+      if (width > maxDimension || height > maxDimension) {
+        const scale = maxDimension / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
       const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = width;
+      canvas.height = height;
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         reject(new Error("Canvas not supported."));
@@ -50,8 +73,8 @@ function extractVideoFrames(file: File, frameCount = 6): Promise<string[]> {
       };
 
       video.onseeked = () => {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        frames.push(canvas.toDataURL("image/jpeg", 0.7));
+        ctx.drawImage(video, 0, 0, width, height);
+        frames.push(canvas.toDataURL("image/jpeg", 0.65));
         index += 1;
         seekNext();
       };
@@ -80,21 +103,34 @@ export default function BearResultsScreenshotImportClient({
     setExtracting(true);
     setError(null);
     setStatus(null);
-    const result = await extractBearResultsScreenshot(dataUrls);
-    setExtracting(false);
-    if (result.error) {
-      setError(result.error);
-      return;
+    try {
+      const result = await withTimeout(extractBearResultsScreenshot(dataUrls), EXTRACT_TIMEOUT_MS);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setRows(result.rows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Extraction failed.");
+    } finally {
+      setExtracting(false);
     }
-    setRows(result.rows);
   }
 
   async function handlePhotos(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
-    const dataUrls = await Promise.all(files.map(fileToDataUrl));
     e.target.value = "";
-    await runExtraction(dataUrls);
+    setExtracting(true);
+    setError(null);
+    setStatus(null);
+    try {
+      const dataUrls = await Promise.all(files.map((f) => resizeImageDataUrl(f)));
+      await runExtraction(dataUrls);
+    } catch (err) {
+      setExtracting(false);
+      setError(err instanceof Error ? err.message : "Couldn't read that image.");
+    }
   }
 
   async function handleVideo(e: React.ChangeEvent<HTMLInputElement>) {
