@@ -10,7 +10,7 @@ type Row = { nameOrChiefId: string; score: number; memberId: string | null; gues
 
 // A slow AI extraction that never resolves would leave the UI stuck on
 // "Reading…" forever with no feedback — race it against a timeout instead.
-const EXTRACT_TIMEOUT_MS = 45000;
+const EXTRACT_TIMEOUT_MS = 75000;
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
@@ -34,7 +34,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 // JPEG data URLs — smaller frames mean a faster upload and a faster vision
 // model response, so the same extraction used for screenshots can read them
 // without "ages" of waiting.
-function extractVideoFrames(file: File, frameCount = 4, maxDimension = 1000): Promise<string[]> {
+function extractVideoFrames(file: File, frameCount = 10, maxDimension = 1000): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     video.preload = "auto";
