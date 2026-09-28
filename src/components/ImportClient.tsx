@@ -39,7 +39,7 @@ function parseCsv(text: string): Row[] {
 
 // Grabs a handful of evenly-spaced, downscaled frames from a video file as
 // JPEG data URLs — same approach as the Bear results video import.
-function extractVideoFrames(file: File, frameCount = 16, maxDimension = 1300): Promise<string[]> {
+function extractVideoFrames(file: File, frameCount = 16, maxDimension = 1000): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     video.preload = "auto";
@@ -166,12 +166,13 @@ export default function ImportClient({
   // hosting platform's function execution limit — that shows up as an opaque
   // "unexpected response"/"Server Action not found" error, not a clean
   // timeout. Splitting into small batches keeps each call fast regardless of
-  // how many frames the video produced. Running them fully in parallel,
-  // though, can burst past OpenAI's tokens-per-minute limit — a small
-  // concurrency cap keeps that from happening (screenshotImport.ts also
-  // retries once on a 429 as a safety net).
-  const BATCH_SIZE = 4;
-  const CONCURRENCY = 2;
+  // how many frames the video produced. But a big roster (16+ frames) can
+  // still burst past OpenAI's tokens-per-minute limit even with a couple
+  // retries, so batches run one at a time with a short pause between them —
+  // slower, but it actually stays under the cap instead of hoping a retry
+  // catches a mostly-exhausted window.
+  const BATCH_SIZE = 2;
+  const BATCH_DELAY_MS = 1500;
 
   async function runExtraction(dataUrls: string[]) {
     setExtracting(true);
@@ -184,22 +185,20 @@ export default function ImportClient({
       batches.push(dataUrls.slice(i, i + BATCH_SIZE));
     }
 
-    async function runWithConcurrency<T>(items: string[][], worker: (batch: string[]) => Promise<T>) {
-      const results: T[] = new Array(items.length);
-      let next = 0;
-      async function runNext(): Promise<void> {
-        const i = next++;
-        if (i >= items.length) return;
-        results[i] = await worker(items[i]);
-        await runNext();
+    async function runSequentially<T>(items: string[][], worker: (batch: string[]) => Promise<T>) {
+      const results: T[] = [];
+      for (let i = 0; i < items.length; i++) {
+        results.push(await worker(items[i]));
+        if (i < items.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
+        }
       }
-      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, runNext));
       return results;
     }
 
     try {
       const results = await withTimeout(
-        runWithConcurrency(batches, (batch) => extractMembersScreenshot(batch)),
+        runSequentially(batches, (batch) => extractMembersScreenshot(batch)),
         EXTRACT_TIMEOUT_MS
       );
       const firstError = results.find((r) => r.error)?.error;
