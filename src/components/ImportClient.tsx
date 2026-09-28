@@ -162,28 +162,38 @@ export default function ImportClient({
     setResult(null);
   }
 
+  // A single server call carrying many large frames risks running past the
+  // hosting platform's function execution limit — that shows up as an opaque
+  // "unexpected response"/"Server Action not found" error, not a clean
+  // timeout. Splitting into small batches sent in parallel keeps each call
+  // fast regardless of how many frames the video produced.
+  const BATCH_SIZE = 4;
+
   async function runExtraction(dataUrls: string[]) {
     setExtracting(true);
     setError(null);
     setStatus(null);
     setResult(null);
 
-    const totalBytes = dataUrls.reduce((sum, url) => sum + url.length * 0.75, 0);
-    if (totalBytes > 4.5 * 1024 * 1024) {
-      setExtracting(false);
-      setError("That's too much to send at once — try fewer photos or a shorter video.");
-      return;
+    const batches: string[][] = [];
+    for (let i = 0; i < dataUrls.length; i += BATCH_SIZE) {
+      batches.push(dataUrls.slice(i, i + BATCH_SIZE));
     }
 
     try {
-      const res = await withTimeout(extractMembersScreenshot(dataUrls), EXTRACT_TIMEOUT_MS);
-      if (res.error) {
-        setError(res.error);
+      const results = await withTimeout(
+        Promise.all(batches.map((batch) => extractMembersScreenshot(batch))),
+        EXTRACT_TIMEOUT_MS
+      );
+      const firstError = results.find((r) => r.error)?.error;
+      if (firstError && results.every((r) => r.error)) {
+        setError(firstError);
         return;
       }
+      const allRows = results.flatMap((r) => r.rows);
       setRows(
         withGuesses(
-          res.rows.map((r) => ({
+          allRows.map((r) => ({
             name: r.name,
             power: r.power != null ? String(r.power) : "",
             level: r.level != null ? String(r.level) : "",
@@ -191,6 +201,9 @@ export default function ImportClient({
           }))
         )
       );
+      if (firstError) {
+        setError(`Some batches failed and were skipped: ${firstError}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed.");
     } finally {

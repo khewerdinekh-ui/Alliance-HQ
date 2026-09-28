@@ -135,7 +135,7 @@ export async function extractMembersFromImages(dataUrls: string[]): Promise<Extr
     MEMBERS_SYSTEM_PROMPT,
     "Extract the complete alliance member roster from the following screenshot(s)/frame(s). List every player — do not omit any.",
     dataUrls,
-    16000
+    6000
   )) as { rows?: ExtractedMemberRow[] };
 
   return (parsed.rows ?? [])
