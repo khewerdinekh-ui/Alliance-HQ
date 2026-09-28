@@ -190,10 +190,20 @@ export default function ImportClient({
         setError(firstError);
         return;
       }
+      // Batches are extracted independently, so the same person appearing in
+      // two overlapping frames comes back as two rows — power is effectively
+      // a unique fingerprint per player, so use it to merge duplicates.
       const allRows = results.flatMap((r) => r.rows);
+      const seenPower = new Set<number>();
+      const deduped = allRows.filter((r) => {
+        if (r.power == null) return true;
+        if (seenPower.has(r.power)) return false;
+        seenPower.add(r.power);
+        return true;
+      });
       setRows(
         withGuesses(
-          allRows.map((r) => ({
+          deduped.map((r) => ({
             name: r.name,
             power: r.power != null ? String(r.power) : "",
             level: r.level != null ? String(r.level) : "",
