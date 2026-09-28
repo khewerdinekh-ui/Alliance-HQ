@@ -77,6 +77,14 @@ export default function ScreenshotImportClient({
   async function handleExtract() {
     setExtracting(true);
     setError(null);
+
+    const totalBytes = images.reduce((sum, url) => sum + url.length * 0.75, 0);
+    if (totalBytes > 4.5 * 1024 * 1024) {
+      setExtracting(false);
+      setError("That's too much to send at once — try fewer screenshots.");
+      return;
+    }
+
     try {
       const result = await withTimeout(extractAttendanceScreenshot(images), EXTRACT_TIMEOUT_MS);
       if (result.error) {

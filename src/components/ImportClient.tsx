@@ -39,7 +39,7 @@ function parseCsv(text: string): Row[] {
 
 // Grabs a handful of evenly-spaced, downscaled frames from a video file as
 // JPEG data URLs — same approach as the Bear results video import.
-function extractVideoFrames(file: File, frameCount = 24, maxDimension = 1100): Promise<string[]> {
+function extractVideoFrames(file: File, frameCount = 16, maxDimension = 850): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     video.preload = "auto";
@@ -79,7 +79,7 @@ function extractVideoFrames(file: File, frameCount = 24, maxDimension = 1100): P
 
       video.onseeked = () => {
         ctx.drawImage(video, 0, 0, width, height);
-        frames.push(canvas.toDataURL("image/jpeg", 0.65));
+        frames.push(canvas.toDataURL("image/jpeg", 0.55));
         index += 1;
         seekNext();
       };
@@ -167,6 +167,14 @@ export default function ImportClient({
     setError(null);
     setStatus(null);
     setResult(null);
+
+    const totalBytes = dataUrls.reduce((sum, url) => sum + url.length * 0.75, 0);
+    if (totalBytes > 4.5 * 1024 * 1024) {
+      setExtracting(false);
+      setError("That's too much to send at once — try fewer photos or a shorter video.");
+      return;
+    }
+
     try {
       const res = await withTimeout(extractMembersScreenshot(dataUrls), EXTRACT_TIMEOUT_MS);
       if (res.error) {

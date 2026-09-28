@@ -105,6 +105,14 @@ export default function BearResultsScreenshotImportClient({
     setExtracting(true);
     setError(null);
     setStatus(null);
+
+    const totalBytes = dataUrls.reduce((sum, url) => sum + url.length * 0.75, 0);
+    if (totalBytes > 4.5 * 1024 * 1024) {
+      setExtracting(false);
+      setError("That's too much to send at once — try fewer photos or a shorter video.");
+      return;
+    }
+
     try {
       const result = await withTimeout(extractBearResultsScreenshot(dataUrls), EXTRACT_TIMEOUT_MS);
       if (result.error) {
