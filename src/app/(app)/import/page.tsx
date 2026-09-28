@@ -12,7 +12,11 @@ export default async function ImportPage() {
   const supabase = await createClient();
   const [{ data: subAlliances }, { data: members }] = await Promise.all([
     supabase.from("sub_alliances").select("id, name").eq("org_id", membership.orgId).order("name"),
-    supabase.from("members").select("id, name, chief_id, aliases").eq("org_id", membership.orgId),
+    supabase
+      .from("members")
+      .select("id, name, chief_id, aliases")
+      .eq("org_id", membership.orgId)
+      .order("name"),
   ]);
 
   return (

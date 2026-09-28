@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
 import { extractMembersFromImages } from "@/lib/screenshotImport";
-import { guessMemberId } from "@/lib/memberMatch";
+import { guessMemberId, stripTag } from "@/lib/memberMatch";
 
 export type ImportRow = {
   name: string;
@@ -17,6 +17,10 @@ export type ImportRow = {
   // undefined means "let the server guess" (used by plain CSV rows that
   // never went through the review UI's matcher).
   memberId?: string | null;
+  // True when the admin picked/changed the match by hand (as opposed to
+  // accepting the auto-guess) — triggers a name update + alias so the same
+  // reading auto-matches next time (see the rename block below).
+  manualMatch?: boolean;
 };
 
 const RANKS = new Set(["R1", "R2", "R3", "R4", "R5"]);
@@ -115,9 +119,31 @@ export async function bulkImportMembers(rows: ImportRow[], subAllianceId?: strin
     if (matchId) {
       matchedIds.add(matchId);
       const existing = memberById.get(matchId)!;
+
+      // A manually-picked match means the admin confirmed this reading is
+      // that member under a name the roster doesn't have on file yet (an
+      // OCR variant, decoration, or a real in-game rename) — adopt it as
+      // the current name and keep the old one as an alias, so the same
+      // reading matches automatically next time instead of asking again.
+      let newName = existing.name;
+      let newAliases = existing.aliases ?? [];
+      if (row.manualMatch) {
+        const stripped = stripTag(name);
+        if (stripped && stripped !== existing.name) {
+          const aliases = new Set(existing.aliases ?? []);
+          aliases.add(existing.name);
+          if (name !== stripped) aliases.add(name);
+          aliases.delete(stripped);
+          newName = stripped;
+          newAliases = [...aliases];
+        }
+      }
+
       await supabase
         .from("members")
         .update({
+          name: newName,
+          aliases: newAliases,
           status: "current",
           sub_alliance_id: rowSubAllianceId ?? existing.sub_alliance_id,
           alliance_rank: rank && RANKS.has(rank) ? rank : undefined,

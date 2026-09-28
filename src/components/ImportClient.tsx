@@ -11,7 +11,7 @@ import {
 import { resizeImageDataUrl } from "@/lib/imageResize";
 import { guessMemberId, type MatchableMember } from "@/lib/memberMatch";
 
-type Row = ImportRow;
+type Row = ImportRow & { guessedMemberId?: string };
 
 function parseCsv(text: string): Row[] {
   const lines = text
@@ -136,12 +136,12 @@ export default function ImportClient({
   const selectedAllianceName = subAlliances.find((a) => a.id === subAllianceId)?.name ?? "";
 
   function withGuesses(rows: Row[]): Row[] {
-    return rows.map((r) => ({
-      ...r,
-      memberId: r.chiefId?.trim()
+    return rows.map((r) => {
+      const guessedMemberId = r.chiefId?.trim()
         ? (members.find((m) => m.chiefId === r.chiefId!.trim())?.id ?? "")
-        : (guessMemberId(r.name, members) ?? ""),
-    }));
+        : (guessMemberId(r.name, members) ?? "");
+      return { ...r, memberId: guessedMemberId, guessedMemberId };
+    });
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -277,7 +277,8 @@ export default function ImportClient({
 
   async function handleImport() {
     setImporting(true);
-    const res = await bulkImportMembers(rows, subAllianceId || null);
+    const payload = rows.map((r) => ({ ...r, manualMatch: r.memberId !== r.guessedMemberId }));
+    const res = await bulkImportMembers(payload, subAllianceId || null);
     setImporting(false);
     if (res.error) {
       setStatus(res.error);
