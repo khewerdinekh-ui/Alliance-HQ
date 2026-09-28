@@ -2,9 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { bulkImportMembers, type ImportRow } from "@/app/(app)/import/actions";
+import {
+  bulkImportMembers,
+  extractMembersScreenshot,
+  markMembersOld,
+  type ImportRow,
+} from "@/app/(app)/import/actions";
+import { resizeImageDataUrl } from "@/lib/imageResize";
 
-function parseCsv(text: string): ImportRow[] {
+type Row = ImportRow;
+
+function parseCsv(text: string): Row[] {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -28,11 +36,94 @@ function parseCsv(text: string): ImportRow[] {
   });
 }
 
-export default function ImportClient() {
+// Grabs a handful of evenly-spaced, downscaled frames from a video file as
+// JPEG data URLs — same approach as the Bear results video import.
+function extractVideoFrames(file: File, frameCount = 10, maxDimension = 1000): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.preload = "auto";
+    video.muted = true;
+    video.src = URL.createObjectURL(file);
+
+    const frames: string[] = [];
+    let index = 0;
+
+    video.onerror = () => reject(new Error("Couldn't read that video file."));
+
+    video.onloadedmetadata = () => {
+      let width = video.videoWidth;
+      let height = video.videoHeight;
+      if (width > maxDimension || height > maxDimension) {
+        const scale = maxDimension / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Canvas not supported."));
+        return;
+      }
+
+      const seekNext = () => {
+        if (index >= frameCount) {
+          URL.revokeObjectURL(video.src);
+          resolve(frames);
+          return;
+        }
+        video.currentTime = (video.duration * (index + 1)) / (frameCount + 1);
+      };
+
+      video.onseeked = () => {
+        ctx.drawImage(video, 0, 0, width, height);
+        frames.push(canvas.toDataURL("image/jpeg", 0.65));
+        index += 1;
+        seekNext();
+      };
+
+      seekNext();
+    };
+  });
+}
+
+const EXTRACT_TIMEOUT_MS = 75000;
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("This is taking too long. Try fewer photos, a shorter video, or check your connection.")),
+      ms
+    );
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      }
+    );
+  });
+}
+
+type ImportResult = {
+  newNames: string[];
+  updatedNames: string[];
+  missing: { id: string; name: string }[];
+};
+
+export default function ImportClient({ subAlliances }: { subAlliances: { id: string; name: string }[] }) {
   const router = useRouter();
-  const [rows, setRows] = useState<ImportRow[]>([]);
+  const [subAllianceId, setSubAllianceId] = useState("");
+  const [rows, setRows] = useState<Row[]>([]);
   const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [extracting, setExtracting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [marking, setMarking] = useState(false);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -41,6 +132,7 @@ export default function ImportClient() {
     reader.onload = () => {
       setRows(parseCsv(String(reader.result ?? "")));
       setStatus(null);
+      setResult(null);
     };
     reader.readAsText(file);
   }
@@ -48,23 +140,119 @@ export default function ImportClient() {
   function handlePaste(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setRows(parseCsv(e.target.value));
     setStatus(null);
+    setResult(null);
+  }
+
+  async function runExtraction(dataUrls: string[]) {
+    setExtracting(true);
+    setError(null);
+    setStatus(null);
+    setResult(null);
+    try {
+      const res = await withTimeout(extractMembersScreenshot(dataUrls), EXTRACT_TIMEOUT_MS);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setRows(
+        res.rows.map((r) => ({
+          name: r.name,
+          power: r.power != null ? String(r.power) : "",
+          level: r.level != null ? String(r.level) : "",
+        }))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Extraction failed.");
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  async function handlePhotos(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    e.target.value = "";
+    setExtracting(true);
+    setError(null);
+    try {
+      const dataUrls = await Promise.all(files.map((f) => resizeImageDataUrl(f)));
+      await runExtraction(dataUrls);
+    } catch (err) {
+      setExtracting(false);
+      setError(err instanceof Error ? err.message : "Couldn't read that image.");
+    }
+  }
+
+  async function handleVideo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setExtracting(true);
+    setError(null);
+    try {
+      const frames = await extractVideoFrames(file);
+      await runExtraction(frames);
+    } catch (err) {
+      setExtracting(false);
+      setError(err instanceof Error ? err.message : "Couldn't read that video.");
+    }
+  }
+
+  function updateRow(i: number, patch: Partial<Row>) {
+    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+
+  function removeRow(i: number) {
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
   }
 
   async function handleImport() {
     setImporting(true);
-    const result = await bulkImportMembers(rows);
+    const res = await bulkImportMembers(rows, subAllianceId || null);
     setImporting(false);
-    if (result.error) {
-      setStatus(result.error);
-    } else {
-      setStatus(`Imported ${result.imported} member${result.imported === 1 ? "" : "s"}.`);
-      setRows([]);
-      router.refresh();
+    if (res.error) {
+      setStatus(res.error);
+      return;
     }
+    setStatus(
+      `${res.newNames.length} new, ${res.updatedNames.length} updated.` +
+        (subAllianceId ? "" : " Pick an alliance above to also see who's missing from the list.")
+    );
+    setResult({ newNames: res.newNames, updatedNames: res.updatedNames, missing: res.missing });
+    setRows([]);
+    router.refresh();
+  }
+
+  async function handleMarkOld(ids: string[]) {
+    setMarking(true);
+    await markMembersOld(ids);
+    setMarking(false);
+    setResult((prev) => (prev ? { ...prev, missing: prev.missing.filter((m) => !ids.includes(m.id)) } : prev));
+    router.refresh();
   }
 
   return (
     <div className="space-y-6">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Alliance</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Applies to every row below that doesn't specify its own alliance column. Pick one to also see
+          who's no longer in the imported list.
+        </p>
+        <select
+          value={subAllianceId}
+          onChange={(e) => setSubAllianceId(e.target.value)}
+          className="mt-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        >
+          <option value="">No specific alliance</option>
+          {subAlliances.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Upload a CSV file</h2>
         <p className="mt-1 text-xs text-slate-500">
@@ -84,6 +272,26 @@ export default function ImportClient() {
           placeholder="name,chief_id,alliance,rank,power,level"
           className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs"
         />
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Or import from photo/video (AI)</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Upload a screenshot or short video of the alliance member roster. An AI model reads names,
+          power and level — always review before importing.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <label className="cursor-pointer rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">
+            Photos
+            <input type="file" accept="image/*" multiple onChange={handlePhotos} className="hidden" />
+          </label>
+          <label className="cursor-pointer rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">
+            Video
+            <input type="file" accept="video/*" onChange={handleVideo} className="hidden" />
+          </label>
+        </div>
+        {extracting && <p className="mt-2 text-xs text-slate-500">Reading…</p>}
+        {error && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
       </div>
 
       {rows.length > 0 && (
@@ -109,30 +317,117 @@ export default function ImportClient() {
                 <th className="px-4 py-2">Rank</th>
                 <th className="px-4 py-2">Power</th>
                 <th className="px-4 py-2">Level</th>
+                <th className="px-4 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {rows.slice(0, 20).map((r, i) => (
+              {rows.slice(0, 100).map((r, i) => (
                 <tr key={i}>
-                  <td className="px-4 py-2">{r.name}</td>
-                  <td className="px-4 py-2">{r.chiefId}</td>
-                  <td className="px-4 py-2">{r.alliance}</td>
-                  <td className="px-4 py-2">{r.rank}</td>
-                  <td className="px-4 py-2">{r.power}</td>
-                  <td className="px-4 py-2">{r.level}</td>
+                  <td className="px-4 py-2">
+                    <input
+                      value={r.name}
+                      onChange={(e) => updateRow(i, { name: e.target.value })}
+                      className="w-28 rounded border border-slate-200 px-1.5 py-0.5 text-xs"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <input
+                      value={r.chiefId ?? ""}
+                      onChange={(e) => updateRow(i, { chiefId: e.target.value })}
+                      className="w-24 rounded border border-slate-200 px-1.5 py-0.5 text-xs"
+                    />
+                  </td>
+                  <td className="px-4 py-2">{r.alliance || "—"}</td>
+                  <td className="px-4 py-2">
+                    <input
+                      value={r.rank ?? ""}
+                      onChange={(e) => updateRow(i, { rank: e.target.value })}
+                      className="w-14 rounded border border-slate-200 px-1.5 py-0.5 text-xs"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <input
+                      value={r.power ?? ""}
+                      onChange={(e) => updateRow(i, { power: e.target.value })}
+                      className="w-24 rounded border border-slate-200 px-1.5 py-0.5 text-xs"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <input
+                      value={r.level ?? ""}
+                      onChange={(e) => updateRow(i, { level: e.target.value })}
+                      className="w-14 rounded border border-slate-200 px-1.5 py-0.5 text-xs"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <button onClick={() => removeRow(i)} className="text-red-500">
+                      ✕
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {rows.length > 20 && (
+          {rows.length > 100 && (
             <p className="px-4 py-2 text-xs text-slate-400">
-              …and {rows.length - 20} more rows.
+              …and {rows.length - 100} more rows.
             </p>
           )}
         </div>
       )}
 
       {status && <p className="text-sm text-slate-700">{status}</p>}
+
+      {result && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+            <h3 className="text-sm font-semibold text-emerald-900">
+              New members ({result.newNames.length})
+            </h3>
+            <p className="mt-1 text-xs text-emerald-700">
+              {result.newNames.length ? result.newNames.join(", ") : "None — everyone matched an existing member."}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <h3 className="text-sm font-semibold text-slate-900">
+              Updated ({result.updatedNames.length})
+            </h3>
+            <p className="mt-1 text-xs text-slate-500">
+              {result.updatedNames.length ? result.updatedNames.join(", ") : "None."}
+            </p>
+          </div>
+          {result.missing.length > 0 && (
+            <div className="rounded-2xl border border-red-200 bg-red-50/60 p-4 sm:col-span-2">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-red-900">
+                  No longer in the list ({result.missing.length})
+                </h3>
+                <button
+                  onClick={() => handleMarkOld(result.missing.map((m) => m.id))}
+                  disabled={marking}
+                  className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+                >
+                  {marking ? "Marking…" : "Mark all as old"}
+                </button>
+              </div>
+              <div className="mt-2 space-y-1">
+                {result.missing.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between text-xs text-red-700">
+                    <span>{m.name}</span>
+                    <button
+                      onClick={() => handleMarkOld([m.id])}
+                      disabled={marking}
+                      className="text-red-600 hover:underline disabled:opacity-60"
+                    >
+                      Mark as old
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

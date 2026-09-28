@@ -1,3 +1,48 @@
+async function callVisionExtractor(systemPrompt: string, userText: string, dataUrls: string[]) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured.");
+  }
+
+  const content: Array<
+    { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }
+  > = [
+    { type: "text", text: userText },
+    ...dataUrls.map((url) => ({ type: "image_url" as const, image_url: { url } })),
+  ];
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content },
+      ],
+      max_tokens: 4000,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`OpenAI request failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+
+  const json = await res.json();
+  const raw = json.choices?.[0]?.message?.content ?? "{}";
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error("Couldn't parse the model's response as JSON.");
+  }
+}
+
 export type ExtractedAttendanceRow = {
   nameOrChiefId: string;
   signedUp: boolean;
@@ -15,52 +60,11 @@ Use "" for reason when none is shown. Do not include any text outside the JSON o
 export async function extractAttendanceFromImages(
   dataUrls: string[]
 ): Promise<ExtractedAttendanceRow[]> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured.");
-  }
-
-  const content: Array<
-    { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }
-  > = [
-    {
-      type: "text",
-      text: "Extract the attendance list from the following screenshot(s).",
-    },
-    ...dataUrls.map((url) => ({ type: "image_url" as const, image_url: { url } })),
-  ];
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content },
-      ],
-      max_tokens: 4000,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OpenAI request failed (${res.status}): ${text.slice(0, 300)}`);
-  }
-
-  const json = await res.json();
-  const raw = json.choices?.[0]?.message?.content ?? "{}";
-
-  let parsed: { rows?: ExtractedAttendanceRow[] };
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("Couldn't parse the model's response as JSON.");
-  }
+  const parsed = (await callVisionExtractor(
+    SYSTEM_PROMPT,
+    "Extract the attendance list from the following screenshot(s).",
+    dataUrls
+  )) as { rows?: ExtractedAttendanceRow[] };
 
   return (parsed.rows ?? []).map((r) => ({
     nameOrChiefId: String(r.nameOrChiefId ?? "").trim(),
@@ -82,52 +86,11 @@ Strip commas/formatting from the score and return it as a plain number. Skip row
 Do not include any text outside the JSON object.`;
 
 export async function extractBearResultsFromImages(dataUrls: string[]): Promise<ExtractedBearResultRow[]> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured.");
-  }
-
-  const content: Array<
-    { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }
-  > = [
-    {
-      type: "text",
-      text: "Extract the Bear results leaderboard from the following screenshot(s)/frame(s).",
-    },
-    ...dataUrls.map((url) => ({ type: "image_url" as const, image_url: { url } })),
-  ];
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: BEAR_RESULTS_SYSTEM_PROMPT },
-        { role: "user", content },
-      ],
-      max_tokens: 4000,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OpenAI request failed (${res.status}): ${text.slice(0, 300)}`);
-  }
-
-  const json = await res.json();
-  const raw = json.choices?.[0]?.message?.content ?? "{}";
-
-  let parsed: { rows?: ExtractedBearResultRow[] };
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("Couldn't parse the model's response as JSON.");
-  }
+  const parsed = (await callVisionExtractor(
+    BEAR_RESULTS_SYSTEM_PROMPT,
+    "Extract the Bear results leaderboard from the following screenshot(s)/frame(s).",
+    dataUrls
+  )) as { rows?: ExtractedBearResultRow[] };
 
   return (parsed.rows ?? [])
     .map((r) => ({
@@ -135,4 +98,32 @@ export async function extractBearResultsFromImages(dataUrls: string[]): Promise<
       score: Number(r.score),
     }))
     .filter((r) => r.nameOrChiefId && Number.isFinite(r.score));
+}
+
+export type ExtractedMemberRow = {
+  name: string;
+  power: number | null;
+  level: number | null;
+};
+
+const MEMBERS_SYSTEM_PROMPT = `You read screenshots or video frames of a mobile game's alliance member roster/list screen.
+For every player listed, extract their in-game name, their Power (a large number, may include commas or a "K"/"M" suffix — expand it to a plain number), and their Furnace/Castle level if shown (a small integer).
+Respond with strict JSON only: {"rows": [{"name": string, "power": number | null, "level": number | null}]}.
+Use null for power or level when not shown or not legible. Skip rows with no readable name.
+Do not include any text outside the JSON object.`;
+
+export async function extractMembersFromImages(dataUrls: string[]): Promise<ExtractedMemberRow[]> {
+  const parsed = (await callVisionExtractor(
+    MEMBERS_SYSTEM_PROMPT,
+    "Extract the alliance member roster from the following screenshot(s)/frame(s).",
+    dataUrls
+  )) as { rows?: ExtractedMemberRow[] };
+
+  return (parsed.rows ?? [])
+    .map((r) => ({
+      name: String(r.name ?? "").trim(),
+      power: r.power != null && Number.isFinite(Number(r.power)) ? Number(r.power) : null,
+      level: r.level != null && Number.isFinite(Number(r.level)) ? Number(r.level) : null,
+    }))
+    .filter((r) => r.name);
 }

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
+import { extractMembersFromImages } from "@/lib/screenshotImport";
+import { guessMemberId } from "@/lib/memberMatch";
 
 export type ImportRow = {
   name: string;
@@ -15,35 +17,68 @@ export type ImportRow = {
 
 const RANKS = new Set(["R1", "R2", "R3", "R4", "R5"]);
 
-export async function bulkImportMembers(rows: ImportRow[]) {
+async function assertAdmin() {
   const membership = await requireMembership();
   if (!membership.isAdmin) {
-    return { imported: 0, error: "Only admins can import members." };
+    throw new Error("Only admins can import members.");
   }
+  return membership;
+}
 
-  const supabase = await createClient();
+export async function extractMembersScreenshot(
+  dataUrls: string[]
+): Promise<{ rows: { name: string; power: number | null; level: number | null }[]; error: string | null }> {
+  try {
+    const rows = await extractMembersFromImages(dataUrls);
+    return { rows, error: null };
+  } catch (err) {
+    return { rows: [], error: err instanceof Error ? err.message : "Extraction failed." };
+  }
+}
+
+// Importing a fresh roster screenshot/video for one alliance is the best
+// signal of who's actually in it now — bulkImportMembers matches each row
+// against the org's current roster (by Chief ID, name, or alias) so existing
+// members get updated rather than duplicated, reports which rows were
+// genuinely new, and — when a sub-alliance is chosen — reports which of that
+// alliance's current members were absent from this import (likely left),
+// without changing their status itself (see markMembersOld).
+export async function bulkImportMembers(rows: ImportRow[], subAllianceId?: string | null) {
+  const membership = await assertAdmin();
   const orgId = membership.orgId;
+  const supabase = await createClient();
 
-  const { data: subAlliances } = await supabase
-    .from("sub_alliances")
-    .select("id, name")
-    .eq("org_id", orgId);
+  const [{ data: subAlliances }, { data: existingMembers }] = await Promise.all([
+    supabase.from("sub_alliances").select("id, name").eq("org_id", orgId),
+    supabase
+      .from("members")
+      .select("id, name, chief_id, aliases, sub_alliance_id, status")
+      .eq("org_id", orgId),
+  ]);
 
-  const subAllianceByName = new Map(
-    subAlliances?.map((a) => [a.name.trim().toLowerCase(), a.id])
-  );
+  const subAllianceByName = new Map((subAlliances ?? []).map((a) => [a.name.trim().toLowerCase(), a.id]));
+  const matchable = (existingMembers ?? []).map((m) => ({
+    id: m.id,
+    name: m.name,
+    chiefId: m.chief_id,
+    aliases: m.aliases ?? [],
+  }));
+  const memberById = new Map((existingMembers ?? []).map((m) => [m.id, m]));
 
-  const toInsert = [];
+  const newNames: string[] = [];
+  const updatedNames: string[] = [];
+  const matchedIds = new Set<string>();
+
   for (const row of rows) {
     const name = row.name?.trim();
     if (!name) continue;
 
-    let subAllianceId: string | null = null;
+    let rowSubAllianceId: string | null = subAllianceId ?? null;
     const allianceName = row.alliance?.trim().toLowerCase();
     if (allianceName) {
       const existing = subAllianceByName.get(allianceName);
       if (existing) {
-        subAllianceId = existing;
+        rowSubAllianceId = existing;
       } else {
         const { data: created } = await supabase
           .from("sub_alliances")
@@ -52,33 +87,82 @@ export async function bulkImportMembers(rows: ImportRow[]) {
           .single();
         if (created) {
           subAllianceByName.set(allianceName, created.id);
-          subAllianceId = created.id;
+          rowSubAllianceId = created.id;
         }
       }
     }
 
     const rank = row.rank?.trim().toUpperCase();
+    const power = row.power?.trim() ? Number(row.power) : null;
+    const level = row.level?.trim() ? Number(row.level) : null;
 
-    toInsert.push({
-      org_id: orgId,
-      name,
-      chief_id: row.chiefId?.trim() || null,
-      sub_alliance_id: subAllianceId,
-      alliance_rank: rank && RANKS.has(rank) ? rank : "R1",
-      power: row.power?.trim() ? Number(row.power) : null,
-      level: row.level?.trim() ? Number(row.level) : null,
-    });
+    const matchId = row.chiefId?.trim()
+      ? matchable.find((m) => m.chiefId === row.chiefId!.trim())?.id
+      : guessMemberId(name, matchable);
+
+    if (matchId) {
+      matchedIds.add(matchId);
+      const existing = memberById.get(matchId)!;
+      await supabase
+        .from("members")
+        .update({
+          status: "current",
+          sub_alliance_id: rowSubAllianceId ?? existing.sub_alliance_id,
+          alliance_rank: rank && RANKS.has(rank) ? rank : undefined,
+          power: power ?? undefined,
+          level: level ?? undefined,
+          chief_id: row.chiefId?.trim() || existing.chief_id,
+        })
+        .eq("id", matchId);
+      updatedNames.push(name);
+    } else {
+      const { data: created } = await supabase
+        .from("members")
+        .insert({
+          org_id: orgId,
+          name,
+          chief_id: row.chiefId?.trim() || null,
+          sub_alliance_id: rowSubAllianceId,
+          alliance_rank: rank && RANKS.has(rank) ? rank : "R1",
+          power,
+          level,
+        })
+        .select("id")
+        .single();
+      if (created) matchedIds.add(created.id);
+      newNames.push(name);
+    }
   }
 
-  if (toInsert.length === 0) {
-    return { imported: 0, error: "No valid rows found." };
+  if (newNames.length === 0 && updatedNames.length === 0) {
+    return { imported: 0, newNames: [], updatedNames: [], missing: [], error: "No valid rows found." };
   }
 
-  const { error } = await supabase.from("members").insert(toInsert);
-  if (error) {
-    return { imported: 0, error: error.message };
-  }
+  // Reconciliation: current members of the chosen alliance not seen in this import.
+  const missing = subAllianceId
+    ? (existingMembers ?? [])
+        .filter(
+          (m) =>
+            m.sub_alliance_id === subAllianceId && m.status === "current" && !matchedIds.has(m.id)
+        )
+        .map((m) => ({ id: m.id, name: m.name }))
+    : [];
 
   revalidatePath("/members");
-  return { imported: toInsert.length, error: null };
+  return {
+    imported: newNames.length + updatedNames.length,
+    newNames,
+    updatedNames,
+    missing,
+    error: null,
+  };
+}
+
+export async function markMembersOld(memberIds: string[]) {
+  await assertAdmin();
+  if (!memberIds.length) return;
+
+  const supabase = await createClient();
+  await supabase.from("members").update({ status: "old" }).in("id", memberIds);
+  revalidatePath("/members");
 }
