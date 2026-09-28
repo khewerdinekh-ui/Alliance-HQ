@@ -1,4 +1,9 @@
-async function callVisionExtractor(systemPrompt: string, userText: string, dataUrls: string[]) {
+async function callVisionExtractor(
+  systemPrompt: string,
+  userText: string,
+  dataUrls: string[],
+  maxTokens = 4000
+) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured.");
@@ -24,7 +29,7 @@ async function callVisionExtractor(systemPrompt: string, userText: string, dataU
         { role: "system", content: systemPrompt },
         { role: "user", content },
       ],
-      max_tokens: 4000,
+      max_tokens: maxTokens,
     }),
   });
 
@@ -89,7 +94,8 @@ export async function extractBearResultsFromImages(dataUrls: string[]): Promise<
   const parsed = (await callVisionExtractor(
     BEAR_RESULTS_SYSTEM_PROMPT,
     "Extract the Bear results leaderboard from the following screenshot(s)/frame(s).",
-    dataUrls
+    dataUrls,
+    8000
   )) as { rows?: ExtractedBearResultRow[] };
 
   return (parsed.rows ?? [])
@@ -104,19 +110,32 @@ export type ExtractedMemberRow = {
   name: string;
   power: number | null;
   level: number | null;
+  rank: string | null;
 };
 
 const MEMBERS_SYSTEM_PROMPT = `You read screenshots or video frames of a mobile game's alliance member roster/list screen.
-For every player listed, extract their in-game name, their Power (a large number, may include commas or a "K"/"M" suffix — expand it to a plain number), and their Furnace/Castle level if shown (a small integer).
-Respond with strict JSON only: {"rows": [{"name": string, "power": number | null, "level": number | null}]}.
-Use null for power or level when not shown or not legible. Skip rows with no readable name.
+Multiple frames may show overlapping or different parts of a scrolling list — combine them into one
+complete list, including every distinct player you can see across ALL frames. Do not skip, omit, or
+summarize any row, and do not stop early — a roster can have 100+ members and you must list all of
+them. Only merge two rows into one if they are clearly the exact same player (identical name).
+
+For every player listed, extract:
+- name: their in-game name
+- power: a large number, may include commas or a "K"/"M" suffix — expand it to a plain integer number
+- level: their Furnace/Castle level if shown (a small integer)
+- rank: their alliance rank/role if shown — R1, R2, R3, R4, or R5 (R5 is usually the leader, R4 an
+  officer/deputy, often shown as a colored badge, crown, or star icon next to the name rather than text)
+
+Respond with strict JSON only: {"rows": [{"name": string, "power": number | null, "level": number | null, "rank": string | null}]}.
+Use null for any field not shown or not legible. Skip rows with no readable name.
 Do not include any text outside the JSON object.`;
 
 export async function extractMembersFromImages(dataUrls: string[]): Promise<ExtractedMemberRow[]> {
   const parsed = (await callVisionExtractor(
     MEMBERS_SYSTEM_PROMPT,
-    "Extract the alliance member roster from the following screenshot(s)/frame(s).",
-    dataUrls
+    "Extract the complete alliance member roster from the following screenshot(s)/frame(s). List every player — do not omit any.",
+    dataUrls,
+    16000
   )) as { rows?: ExtractedMemberRow[] };
 
   return (parsed.rows ?? [])
@@ -124,6 +143,7 @@ export async function extractMembersFromImages(dataUrls: string[]): Promise<Extr
       name: String(r.name ?? "").trim(),
       power: r.power != null && Number.isFinite(Number(r.power)) ? Number(r.power) : null,
       level: r.level != null && Number.isFinite(Number(r.level)) ? Number(r.level) : null,
+      rank: r.rank ? String(r.rank).trim().toUpperCase() : null,
     }))
     .filter((r) => r.name);
 }

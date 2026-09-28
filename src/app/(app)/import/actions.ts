@@ -29,9 +29,10 @@ async function assertAdmin() {
   return membership;
 }
 
-export async function extractMembersScreenshot(
-  dataUrls: string[]
-): Promise<{ rows: { name: string; power: number | null; level: number | null }[]; error: string | null }> {
+export async function extractMembersScreenshot(dataUrls: string[]): Promise<{
+  rows: { name: string; power: number | null; level: number | null; rank: string | null }[];
+  error: string | null;
+}> {
   try {
     const rows = await extractMembersFromImages(dataUrls);
     return { rows, error: null };
@@ -169,11 +170,11 @@ export async function bulkImportMembers(rows: ImportRow[], subAllianceId?: strin
   };
 }
 
-export async function markMembersOld(memberIds: string[]) {
+export async function markMembersOld(memberIds: string[], leftAt: string | null) {
   await assertAdmin();
   if (!memberIds.length) return;
 
   const supabase = await createClient();
-  await supabase.from("members").update({ status: "old" }).in("id", memberIds);
+  await supabase.from("members").update({ status: "old", left_at: leftAt }).in("id", memberIds);
   revalidatePath("/members");
 }

@@ -39,7 +39,7 @@ function parseCsv(text: string): Row[] {
 
 // Grabs a handful of evenly-spaced, downscaled frames from a video file as
 // JPEG data URLs — same approach as the Bear results video import.
-function extractVideoFrames(file: File, frameCount = 10, maxDimension = 1000): Promise<string[]> {
+function extractVideoFrames(file: File, frameCount = 24, maxDimension = 1100): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     video.preload = "auto";
@@ -89,7 +89,7 @@ function extractVideoFrames(file: File, frameCount = 10, maxDimension = 1000): P
   });
 }
 
-const EXTRACT_TIMEOUT_MS = 75000;
+const EXTRACT_TIMEOUT_MS = 120000;
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
@@ -131,6 +131,9 @@ export default function ImportClient({
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [marking, setMarking] = useState(false);
+  const [leftDate, setLeftDate] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const selectedAllianceName = subAlliances.find((a) => a.id === subAllianceId)?.name ?? "";
 
   function withGuesses(rows: Row[]): Row[] {
     return rows.map((r) => ({
@@ -176,6 +179,7 @@ export default function ImportClient({
             name: r.name,
             power: r.power != null ? String(r.power) : "",
             level: r.level != null ? String(r.level) : "",
+            rank: r.rank ?? "",
           }))
         )
       );
@@ -243,7 +247,7 @@ export default function ImportClient({
 
   async function handleMarkOld(ids: string[]) {
     setMarking(true);
-    await markMembersOld(ids);
+    await markMembersOld(ids, leftDate || null);
     setMarking(false);
     setResult((prev) => (prev ? { ...prev, missing: prev.missing.filter((m) => !ids.includes(m.id)) } : prev));
     router.refresh();
@@ -372,7 +376,7 @@ export default function ImportClient({
                       className="w-24 rounded border border-slate-200 px-1.5 py-0.5 text-xs"
                     />
                   </td>
-                  <td className="px-4 py-2">{r.alliance || "—"}</td>
+                  <td className="px-4 py-2 text-slate-500">{r.alliance || selectedAllianceName || "—"}</td>
                   <td className="px-4 py-2">
                     <input
                       value={r.rank ?? ""}
@@ -433,17 +437,28 @@ export default function ImportClient({
           </div>
           {result.missing.length > 0 && (
             <div className="rounded-2xl border border-red-200 bg-red-50/60 p-4 sm:col-span-2">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-red-900">
                   No longer in the list ({result.missing.length})
                 </h3>
-                <button
-                  onClick={() => handleMarkOld(result.missing.map((m) => m.id))}
-                  disabled={marking}
-                  className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
-                >
-                  {marking ? "Marking…" : "Mark all as old"}
-                </button>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-red-700">
+                    Left on
+                    <input
+                      type="date"
+                      value={leftDate}
+                      onChange={(e) => setLeftDate(e.target.value)}
+                      className="ml-1.5 rounded border border-red-200 px-1.5 py-1 text-xs"
+                    />
+                  </label>
+                  <button
+                    onClick={() => handleMarkOld(result.missing.map((m) => m.id))}
+                    disabled={marking}
+                    className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+                  >
+                    {marking ? "Marking…" : "Mark all as old"}
+                  </button>
+                </div>
               </div>
               <div className="mt-2 space-y-1">
                 {result.missing.map((m) => (
