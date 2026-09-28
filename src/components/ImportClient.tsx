@@ -165,9 +165,13 @@ export default function ImportClient({
   // A single server call carrying many large frames risks running past the
   // hosting platform's function execution limit — that shows up as an opaque
   // "unexpected response"/"Server Action not found" error, not a clean
-  // timeout. Splitting into small batches sent in parallel keeps each call
-  // fast regardless of how many frames the video produced.
+  // timeout. Splitting into small batches keeps each call fast regardless of
+  // how many frames the video produced. Running them fully in parallel,
+  // though, can burst past OpenAI's tokens-per-minute limit — a small
+  // concurrency cap keeps that from happening (screenshotImport.ts also
+  // retries once on a 429 as a safety net).
   const BATCH_SIZE = 4;
+  const CONCURRENCY = 2;
 
   async function runExtraction(dataUrls: string[]) {
     setExtracting(true);
@@ -180,9 +184,22 @@ export default function ImportClient({
       batches.push(dataUrls.slice(i, i + BATCH_SIZE));
     }
 
+    async function runWithConcurrency<T>(items: string[][], worker: (batch: string[]) => Promise<T>) {
+      const results: T[] = new Array(items.length);
+      let next = 0;
+      async function runNext(): Promise<void> {
+        const i = next++;
+        if (i >= items.length) return;
+        results[i] = await worker(items[i]);
+        await runNext();
+      }
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, runNext));
+      return results;
+    }
+
     try {
       const results = await withTimeout(
-        Promise.all(batches.map((batch) => extractMembersScreenshot(batch))),
+        runWithConcurrency(batches, (batch) => extractMembersScreenshot(batch)),
         EXTRACT_TIMEOUT_MS
       );
       const firstError = results.find((r) => r.error)?.error;

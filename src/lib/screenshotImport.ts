@@ -1,3 +1,7 @@
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function callVisionExtractor(
   systemPrompt: string,
   userText: string,
@@ -16,22 +20,40 @@ async function callVisionExtractor(
     ...dataUrls.map((url) => ({ type: "image_url" as const, image_url: { url } })),
   ];
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content },
-      ],
-      max_tokens: maxTokens,
-    }),
+  const body = JSON.stringify({
+    model: "gpt-4o-mini",
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content },
+    ],
+    max_tokens: maxTokens,
   });
+
+  // Several parallel/queued extraction calls can burst past the account's
+  // tokens-per-minute rate limit; OpenAI's 429 tells us almost exactly how
+  // long to wait, so retry a couple of times instead of failing the batch.
+  let res: Response;
+  let attempt = 0;
+  for (;;) {
+    res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body,
+    });
+
+    if (res.status !== 429 || attempt >= 3) break;
+
+    const retryAfterHeader = Number(res.headers.get("retry-after"));
+    const waitMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
+      ? retryAfterHeader * 1000
+      : 2000 * (attempt + 1);
+    await sleep(waitMs);
+    attempt += 1;
+  }
 
   if (!res.ok) {
     const text = await res.text();
