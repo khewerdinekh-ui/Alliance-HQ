@@ -10,11 +10,10 @@ export default async function ImportPage() {
   }
 
   const supabase = await createClient();
-  const { data: subAlliances } = await supabase
-    .from("sub_alliances")
-    .select("id, name")
-    .eq("org_id", membership.orgId)
-    .order("name");
+  const [{ data: subAlliances }, { data: members }] = await Promise.all([
+    supabase.from("sub_alliances").select("id, name").eq("org_id", membership.orgId).order("name"),
+    supabase.from("members").select("id, name, chief_id, aliases").eq("org_id", membership.orgId),
+  ]);
 
   return (
     <>
@@ -24,7 +23,15 @@ export default async function ImportPage() {
         Import a member list from a spreadsheet, CSV file, or a roster screenshot/video.
       </p>
       <div className="mt-6">
-        <ImportClient subAlliances={subAlliances ?? []} />
+        <ImportClient
+          subAlliances={subAlliances ?? []}
+          members={(members ?? []).map((m) => ({
+            id: m.id,
+            name: m.name,
+            chiefId: m.chief_id,
+            aliases: m.aliases,
+          }))}
+        />
       </div>
     </>
   );

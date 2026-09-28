@@ -13,6 +13,10 @@ export type ImportRow = {
   rank?: string;
   power?: string;
   level?: string;
+  // Explicit match chosen in the review table — "" means "new member",
+  // undefined means "let the server guess" (used by plain CSV rows that
+  // never went through the review UI's matcher).
+  memberId?: string | null;
 };
 
 const RANKS = new Set(["R1", "R2", "R3", "R4", "R5"]);
@@ -63,6 +67,7 @@ export async function bulkImportMembers(rows: ImportRow[], subAllianceId?: strin
     chiefId: m.chief_id,
     aliases: m.aliases ?? [],
   }));
+  const existingIds = new Set((existingMembers ?? []).map((m) => m.id));
   const memberById = new Map((existingMembers ?? []).map((m) => [m.id, m]));
 
   const newNames: string[] = [];
@@ -96,9 +101,15 @@ export async function bulkImportMembers(rows: ImportRow[], subAllianceId?: strin
     const power = row.power?.trim() ? Number(row.power) : null;
     const level = row.level?.trim() ? Number(row.level) : null;
 
-    const matchId = row.chiefId?.trim()
-      ? matchable.find((m) => m.chiefId === row.chiefId!.trim())?.id
-      : guessMemberId(name, matchable);
+    let matchId: string | null | undefined;
+    if (row.memberId !== undefined) {
+      // Explicit decision from the review table: "" means new, an id means that member.
+      matchId = row.memberId && existingIds.has(row.memberId) ? row.memberId : null;
+    } else {
+      matchId = row.chiefId?.trim()
+        ? matchable.find((m) => m.chiefId === row.chiefId!.trim())?.id
+        : guessMemberId(name, matchable);
+    }
 
     if (matchId) {
       matchedIds.add(matchId);

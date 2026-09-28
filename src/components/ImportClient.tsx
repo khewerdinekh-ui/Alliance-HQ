@@ -9,6 +9,7 @@ import {
   type ImportRow,
 } from "@/app/(app)/import/actions";
 import { resizeImageDataUrl } from "@/lib/imageResize";
+import { guessMemberId, type MatchableMember } from "@/lib/memberMatch";
 
 type Row = ImportRow;
 
@@ -114,7 +115,13 @@ type ImportResult = {
   missing: { id: string; name: string }[];
 };
 
-export default function ImportClient({ subAlliances }: { subAlliances: { id: string; name: string }[] }) {
+export default function ImportClient({
+  subAlliances,
+  members,
+}: {
+  subAlliances: { id: string; name: string }[];
+  members: MatchableMember[];
+}) {
   const router = useRouter();
   const [subAllianceId, setSubAllianceId] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
@@ -125,12 +132,21 @@ export default function ImportClient({ subAlliances }: { subAlliances: { id: str
   const [result, setResult] = useState<ImportResult | null>(null);
   const [marking, setMarking] = useState(false);
 
+  function withGuesses(rows: Row[]): Row[] {
+    return rows.map((r) => ({
+      ...r,
+      memberId: r.chiefId?.trim()
+        ? (members.find((m) => m.chiefId === r.chiefId!.trim())?.id ?? "")
+        : (guessMemberId(r.name, members) ?? ""),
+    }));
+  }
+
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      setRows(parseCsv(String(reader.result ?? "")));
+      setRows(withGuesses(parseCsv(String(reader.result ?? ""))));
       setStatus(null);
       setResult(null);
     };
@@ -138,7 +154,7 @@ export default function ImportClient({ subAlliances }: { subAlliances: { id: str
   }
 
   function handlePaste(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setRows(parseCsv(e.target.value));
+    setRows(withGuesses(parseCsv(e.target.value)));
     setStatus(null);
     setResult(null);
   }
@@ -155,11 +171,13 @@ export default function ImportClient({ subAlliances }: { subAlliances: { id: str
         return;
       }
       setRows(
-        res.rows.map((r) => ({
-          name: r.name,
-          power: r.power != null ? String(r.power) : "",
-          level: r.level != null ? String(r.level) : "",
-        }))
+        withGuesses(
+          res.rows.map((r) => ({
+            name: r.name,
+            power: r.power != null ? String(r.power) : "",
+            level: r.level != null ? String(r.level) : "",
+          }))
+        )
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed.");
@@ -312,6 +330,7 @@ export default function ImportClient({ subAlliances }: { subAlliances: { id: str
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-2">Name</th>
+                <th className="px-4 py-2">Match</th>
                 <th className="px-4 py-2">Chief ID</th>
                 <th className="px-4 py-2">Alliance</th>
                 <th className="px-4 py-2">Rank</th>
@@ -322,13 +341,29 @@ export default function ImportClient({ subAlliances }: { subAlliances: { id: str
             </thead>
             <tbody className="divide-y divide-slate-100">
               {rows.slice(0, 100).map((r, i) => (
-                <tr key={i}>
+                <tr key={i} className={r.memberId ? "" : "bg-emerald-50/50"}>
                   <td className="px-4 py-2">
                     <input
                       value={r.name}
                       onChange={(e) => updateRow(i, { name: e.target.value })}
                       className="w-28 rounded border border-slate-200 px-1.5 py-0.5 text-xs"
                     />
+                  </td>
+                  <td className="px-4 py-2">
+                    <select
+                      value={r.memberId ?? ""}
+                      onChange={(e) => updateRow(i, { memberId: e.target.value })}
+                      className={`w-32 rounded border px-1.5 py-0.5 text-xs ${
+                        r.memberId ? "border-slate-200" : "border-emerald-300 text-emerald-700"
+                      }`}
+                    >
+                      <option value="">+ New member</option>
+                      {members.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-4 py-2">
                     <input
