@@ -354,6 +354,7 @@ export type AttendanceImportRow = {
   reason?: string;
   legion?: string;
   lineupRole?: "main" | "sub";
+  score?: number | null;
   memberId?: string | null;
   manualMatch?: boolean;
 };
@@ -409,7 +410,7 @@ export async function bulkImportAttendance(
 
   const { data: existingAttendance } = await supabase
     .from("attendance")
-    .select("member_id, legion, lineup_role, signed_up, status, reason")
+    .select("member_id, legion, lineup_role, signed_up, status, reason, score")
     .eq("event_id", eventId);
   const existingByMember = new Map((existingAttendance ?? []).map((a) => [a.member_id, a]));
 
@@ -459,6 +460,8 @@ export async function bulkImportAttendance(
         lineup_role: prev?.lineup_role ?? row.lineupRole ?? "main",
         reason: reason || null,
         status: arrived ? "attended" : reason ? "excused" : "no_show",
+        // Scores come from the "turned up" list; keep any score already saved.
+        score: row.score ?? prev?.score ?? null,
       });
       continue;
     }
@@ -473,6 +476,7 @@ export async function bulkImportAttendance(
       lineup_role: row.lineupRole ?? "main",
       reason: reason || null,
       status: arrived ? "attended" : reason ? "excused" : "no_show",
+      score: row.score ?? existingByMember.get(memberId)?.score ?? null,
     });
   }
 

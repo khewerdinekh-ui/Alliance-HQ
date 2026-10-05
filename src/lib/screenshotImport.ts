@@ -75,12 +75,15 @@ export type ExtractedAttendanceRow = {
   signedUp: boolean;
   arrived: boolean;
   reason: string;
+  score: number | null;
 };
 
-const SYSTEM_PROMPT = `You read screenshots of a mobile game alliance's event sign-up or attendance list.
+const SYSTEM_PROMPT = `You read screenshots (or frames of a screen recording) of a mobile game alliance's event sign-up, attendance or results list.
 For every player listed, extract: their name or Chief ID (whichever is shown), whether they signed up,
-whether they arrived/participated, and any reason/excuse text shown for an absence.
-Respond with strict JSON only: {"rows": [{"nameOrChiefId": string, "signedUp": boolean, "arrived": boolean, "reason": string}]}.
+whether they arrived/participated, any reason/excuse text shown for an absence, and their score/points
+for the event if a number is shown next to them (digits only, no separators), otherwise null.
+List every player visible across all images exactly once. Do not guess or invent players.
+Respond with strict JSON only: {"rows": [{"nameOrChiefId": string, "signedUp": boolean, "arrived": boolean, "reason": string, "score": number | null}]}.
 If arrival status isn't shown, assume arrived=false and signedUp=true for anyone listed.
 Use "" for reason when none is shown. Do not include any text outside the JSON object.`;
 
@@ -98,6 +101,7 @@ export async function extractAttendanceFromImages(
     signedUp: Boolean(r.signedUp),
     arrived: Boolean(r.arrived),
     reason: String(r.reason ?? "").trim(),
+    score: Number.isFinite(Number(r.score)) && r.score != null ? Number(r.score) : null,
   }));
 }
 

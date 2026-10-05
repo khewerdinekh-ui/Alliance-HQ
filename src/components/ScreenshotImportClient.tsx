@@ -9,6 +9,7 @@ import {
   type EventType,
 } from "@/app/(app)/events/actions";
 import { resizeImageDataUrl } from "@/lib/imageResize";
+import { extractVideoFrames } from "@/lib/videoFrames";
 import { guessMemberId, type MatchableMember } from "@/lib/memberMatch";
 
 type Row = {
@@ -16,13 +17,18 @@ type Row = {
   signedUp: boolean;
   arrived: boolean;
   reason: string;
+  score: number | null;
   memberId: string | null;
   guessedMemberId: string | null;
 };
 
 // A slow AI extraction that never resolves would leave the UI stuck on
 // "Reading…" forever with no feedback — race it against a timeout instead.
-const EXTRACT_TIMEOUT_MS = 45000;
+const EXTRACT_TIMEOUT_MS = 120000;
+// Frames go to the server a couple at a time, one call after another, so no
+// single call runs past the host's time limit or OpenAI's per-minute cap.
+const BATCH_SIZE = 2;
+const BATCH_DELAY_MS = 1500;
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
@@ -69,8 +75,10 @@ export default function ScreenshotImportClient({
     setError(null);
     setStatus(null);
     try {
-      const dataUrls = await Promise.all(files.map((f) => resizeImageDataUrl(f)));
-      setImages(dataUrls);
+      const perFile = await Promise.all(
+        files.map((f) => (f.type.startsWith("video/") ? extractVideoFrames(f) : resizeImageDataUrl(f).then((u) => [u])))
+      );
+      setImages(perFile.flat());
       setRows([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't read that image.");
@@ -81,25 +89,41 @@ export default function ScreenshotImportClient({
     setExtracting(true);
     setError(null);
 
-    const totalBytes = images.reduce((sum, url) => sum + url.length * 0.75, 0);
-    if (totalBytes > 4.5 * 1024 * 1024) {
-      setExtracting(false);
-      setError("That's too much to send at once — try fewer screenshots.");
-      return;
+    const batches: string[][] = [];
+    for (let i = 0; i < images.length; i += BATCH_SIZE) batches.push(images.slice(i, i + BATCH_SIZE));
+
+    async function runAll() {
+      const results: Awaited<ReturnType<typeof extractAttendanceScreenshot>>[] = [];
+      for (let i = 0; i < batches.length; i++) {
+        results.push(await extractAttendanceScreenshot(batches[i]));
+        if (i < batches.length - 1) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+      }
+      return results;
     }
 
     try {
-      const result = await withTimeout(extractAttendanceScreenshot(images), EXTRACT_TIMEOUT_MS);
-      if (result.error) {
-        setError(result.error);
+      const results = await withTimeout(runAll(), EXTRACT_TIMEOUT_MS);
+      const firstError = results.find((r) => r.error)?.error;
+      if (firstError && results.every((r) => r.error)) {
+        setError(firstError);
         return;
       }
+      // Overlapping frames list the same player more than once — keep one row
+      // per name (and the highest score seen for them).
+      const byName = new Map<string, (typeof results)[number]["rows"][number]>();
+      for (const r of results.flatMap((x) => x.rows)) {
+        const key = r.nameOrChiefId.toLowerCase();
+        const prev = byName.get(key);
+        if (!prev) byName.set(key, r);
+        else if ((r.score ?? -1) > (prev.score ?? -1)) byName.set(key, { ...prev, score: r.score });
+      }
       setRows(
-        result.rows.map((r) => {
+        [...byName.values()].map((r) => {
           const guessedMemberId = guessMemberId(r.nameOrChiefId, members);
           return { ...r, memberId: guessedMemberId, guessedMemberId };
         })
       );
+      if (firstError) setError(`Some batches failed and were skipped: ${firstError}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed.");
     } finally {
@@ -142,7 +166,7 @@ export default function ScreenshotImportClient({
   return (
     <details className="mt-3">
       <summary className="cursor-pointer text-xs font-medium text-violet-700 hover:underline">
-        + Import attendance from screenshot (AI)
+        + Import attendance from screenshot or video (AI)
       </summary>
       <div className="mt-3 space-y-3">
         <p className="text-xs text-slate-500">
@@ -151,7 +175,7 @@ export default function ScreenshotImportClient({
         </p>
         <input
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           multiple
           onChange={handleFiles}
           className="text-sm"
@@ -176,6 +200,7 @@ export default function ScreenshotImportClient({
                 <tr>
                   <th className="px-2 py-1.5">AI read</th>
                   <th className="px-2 py-1.5">Member</th>
+                  <th className="px-2 py-1.5">Score</th>
                   {!options?.mode && <th className="px-2 py-1.5">Signed up</th>}
                   {!options?.mode && <th className="px-2 py-1.5">Arrived</th>}
                   {!options?.mode && <th className="px-2 py-1.5">Reason</th>}
@@ -201,6 +226,16 @@ export default function ScreenshotImportClient({
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td className="px-2 py-1">
+                      <input
+                        type="number"
+                        value={r.score ?? ""}
+                        onChange={(e) =>
+                          updateRow(i, { score: e.target.value === "" ? null : Number(e.target.value) })
+                        }
+                        className="w-24 rounded border border-slate-200 px-1.5 py-0.5"
+                      />
                     </td>
                     {!options?.mode && (
                       <>
