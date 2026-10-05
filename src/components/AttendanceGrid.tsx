@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { updateAttendanceRow, type EventType } from "@/app/(app)/events/actions";
 import PunishModal from "@/components/PunishModal";
+import { legionOptions } from "@/lib/legions";
 
 type Row = {
   memberId: string;
@@ -19,7 +20,6 @@ type Row = {
 
 type SortKey = "name" | "legion" | "signedUp" | "arrived";
 
-const LEGIONS = ["Legion 1", "Legion 2"];
 
 export default function AttendanceGrid({
   orgId,
@@ -43,6 +43,10 @@ export default function AttendanceGrid({
   const [search, setSearch] = useState("");
   const [legionFilter, setLegionFilter] = useState("all");
   const [allianceFilter, setAllianceFilter] = useState("all");
+  const LEGIONS = legionOptions(
+    subAlliances,
+    rows.map((r) => r.legion)
+  );
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
   const [, startTransition] = useTransition();

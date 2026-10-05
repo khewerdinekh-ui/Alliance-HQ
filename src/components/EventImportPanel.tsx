@@ -3,10 +3,10 @@
 import { useState } from "react";
 import type { AttendanceImportOptions, EventType } from "@/app/(app)/events/actions";
 import type { MatchableMember } from "@/lib/memberMatch";
+import { legionOptions } from "@/lib/legions";
 import AttendanceImportClient from "@/components/AttendanceImportClient";
 import ScreenshotImportClient from "@/components/ScreenshotImportClient";
 
-const LEGIONS = ["Legion 1", "Legion 2"];
 
 // Lets the admin say what a screenshot/CSV is *for* before importing it: which
 // legion, which event date, and whether the list shows people who signed up
@@ -32,7 +32,13 @@ export default function EventImportPanel({
   const members = alliance ? allMembers.filter((m) => m.subAllianceId === alliance) : allMembers;
   const allianceName = subAlliances.find((a) => a.id === alliance)?.name;
   const [date, setDate] = useState(eventDate);
-  const [legion, setLegion] = useState(LEGIONS[0]);
+  // Four legions with two alliances: "ICX Legion 1/2", "ICY Legion 1/2".
+  // Picking an alliance above narrows the list to that alliance's two.
+  const LEGIONS = legionOptions(
+    alliance ? subAlliances.filter((a) => a.id === alliance) : subAlliances
+  );
+  const [legionChoice, setLegion] = useState(LEGIONS[0]);
+  const legion = LEGIONS.includes(legionChoice) ? legionChoice : LEGIONS[0];
   const [mode, setMode] = useState<"participating" | "arrived">("participating");
 
   const options: AttendanceImportOptions = { eventDate: date || undefined, legion, mode };
