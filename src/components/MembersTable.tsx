@@ -56,6 +56,14 @@ export default function MembersTable({
   const [statusFilter, setStatusFilter] = useState<"current" | "old" | "all">("current");
   const [allianceFilter, setAllianceFilter] = useState<string>("all");
   const [rankFilter, setRankFilter] = useState<string>("all");
+  // Overall attendance % range — blank means no limit on that side.
+  const [minPct, setMinPct] = useState("");
+  const [maxPct, setMaxPct] = useState("");
+  const minVal = minPct.trim() === "" ? null : Number(minPct);
+  const maxVal = maxPct.trim() === "" ? null : Number(maxPct);
+  const pctOk = (p: number) =>
+    (minVal == null || Number.isNaN(minVal) || p >= minVal) &&
+    (maxVal == null || Number.isNaN(maxVal) || p <= maxVal);
   const [chiefIdFilter, setChiefIdFilter] = useState<"all" | "has" | "missing">("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
@@ -71,6 +79,7 @@ export default function MembersTable({
     let rows = members;
     if (allianceFilter !== "all") rows = rows.filter((m) => m.allianceName === allianceFilter);
     if (rankFilter !== "all") rows = rows.filter((m) => m.alliance_rank === rankFilter);
+    rows = rows.filter((m) => pctOk(m.overallPct));
     if (chiefIdFilter === "has") rows = rows.filter((m) => !!m.chief_id);
     if (chiefIdFilter === "missing") rows = rows.filter((m) => !m.chief_id);
     if (search.trim()) {
@@ -83,7 +92,8 @@ export default function MembersTable({
       );
     }
     return rows;
-  }, [members, allianceFilter, rankFilter, chiefIdFilter, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, allianceFilter, rankFilter, chiefIdFilter, search, minPct, maxPct]);
 
   const filtered = useMemo(() => {
     const rows = statusFilter === "all" ? base : base.filter((m) => m.status === statusFilter);
@@ -102,6 +112,7 @@ export default function MembersTable({
     for (const m of members) {
       if (statusFilter !== "all" && m.status !== statusFilter) continue;
       if (rankFilter !== "all" && m.alliance_rank !== rankFilter) continue;
+      if (!pctOk(m.overallPct)) continue;
       if (chiefIdFilter === "has" && !m.chief_id) continue;
       if (chiefIdFilter === "missing" && m.chief_id) continue;
       if (
@@ -117,7 +128,8 @@ export default function MembersTable({
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     return counts;
-  }, [members, statusFilter, rankFilter, chiefIdFilter, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, statusFilter, rankFilter, chiefIdFilter, search, minPct, maxPct]);
 
   const stats = {
     total: base.length,
@@ -227,6 +239,31 @@ export default function MembersTable({
             </option>
           ))}
         </Select>
+
+        <div className="flex items-center gap-1.5 text-sm text-slate-600">
+          <span>Attendance</span>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={minPct}
+            onChange={(e) => setMinPct(e.target.value)}
+            placeholder="over %"
+            aria-label="Minimum attendance percentage"
+            className="w-20 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"
+          />
+          <span>to</span>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={maxPct}
+            onChange={(e) => setMaxPct(e.target.value)}
+            placeholder="under %"
+            aria-label="Maximum attendance percentage"
+            className="w-20 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"
+          />
+        </div>
 
         {isAdmin && (
           <button
