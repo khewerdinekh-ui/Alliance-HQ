@@ -30,7 +30,22 @@ export async function computeOverallPercents(
       e.event_type === "bear" ? `bear-${e.event_date}` : e.id,
     ])
   );
-  const totalEvents = new Set(unitByEventId.values()).size;
+  // Date of each unit, so a member who joined inside the window is measured
+  // only from their join date — exactly like the Percentages page.
+  const dateByUnit = new Map<string, string>();
+  for (const e of events ?? []) {
+    const unit = e.event_type === "bear" ? `bear-${e.event_date}` : e.id;
+    dateByUnit.set(unit, e.event_date);
+  }
+  const rangeStartStr = formatDate(rangeStart);
+  const { data: memberDates } = await supabase.from("members").select("id, joined_at").eq("org_id", orgId);
+  const startByMember = new Map(
+    (memberDates ?? []).map((m) => [
+      m.id as string,
+      m.joined_at && (m.joined_at as string) > rangeStartStr ? (m.joined_at as string) : rangeStartStr,
+    ])
+  );
+  const unitsSince = (start: string) => [...dateByUnit.values()].filter((d) => d >= start).length;
   const eventIds = events?.map((e) => e.id) ?? [];
 
   const result = new Map<string, number>();
@@ -50,12 +65,15 @@ export async function computeOverallPercents(
     if (row.status !== "attended") continue;
     const unit = unitByEventId.get(row.event_id);
     if (!unit) continue;
+    const start = startByMember.get(row.member_id) ?? rangeStartStr;
+    if ((dateByUnit.get(unit) ?? "") < start) continue;
     if (!attendedUnitsByMember.has(row.member_id)) attendedUnitsByMember.set(row.member_id, new Set());
     attendedUnitsByMember.get(row.member_id)!.add(unit);
   }
 
   for (const [memberId, units] of attendedUnitsByMember) {
-    result.set(memberId, Math.round((units.size / totalEvents) * 1000) / 10);
+    const total = unitsSince(startByMember.get(memberId) ?? rangeStartStr);
+    result.set(memberId, total > 0 ? Math.round((units.size / total) * 1000) / 10 : 0);
   }
 
   return result;
