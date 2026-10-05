@@ -16,14 +16,21 @@ export default function EventImportPanel({
   eventId,
   eventType,
   eventDate,
-  members,
+  members: allMembers,
+  subAlliances,
 }: {
   orgId: string;
   eventId: string;
   eventType: EventType;
   eventDate: string;
   members: MatchableMember[];
+  subAlliances: { id: string; name: string }[];
 }) {
+  const [alliance, setAlliance] = useState("");
+  // Picking an alliance narrows who the importers can match names to, which
+  // stops a misread name matching someone from a different alliance.
+  const members = alliance ? allMembers.filter((m) => m.subAllianceId === alliance) : allMembers;
+  const allianceName = subAlliances.find((a) => a.id === alliance)?.name;
   const [date, setDate] = useState(eventDate);
   const [legion, setLegion] = useState(LEGIONS[0]);
   const [mode, setMode] = useState<"participating" | "arrived">("participating");
@@ -35,6 +42,23 @@ export default function EventImportPanel({
       <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
         <p className="text-xs font-semibold text-slate-700">Import settings</p>
         <div className="mt-2 flex flex-wrap items-end gap-3 text-xs text-slate-600">
+          {subAlliances.length > 0 && (
+            <label className="flex flex-col gap-1">
+              Alliance
+              <select
+                value={alliance}
+                onChange={(e) => setAlliance(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5"
+              >
+                <option value="">All alliances</option>
+                {subAlliances.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="flex flex-col gap-1">
             Legion
             <select
@@ -71,7 +95,8 @@ export default function EventImportPanel({
           </label>
         </div>
         <p className="mt-2 text-[11px] text-slate-500">
-          Everyone imported is put in {legion} on {date || "the chosen date"}.{" "}
+          Everyone imported is put in {legion} on {date || "the chosen date"}
+          {allianceName ? `, matched against ${allianceName} members only` : ""}.{" "}
           {mode === "arrived"
             ? "They're marked as arrived."
             : "They're marked as signed up; anyone already marked arrived stays arrived."}{" "}

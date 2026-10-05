@@ -7,6 +7,7 @@ import PunishModal from "@/components/PunishModal";
 type Row = {
   memberId: string;
   name: string;
+  subAllianceId: string | null;
   legion: string | null;
   lineupRole: "main" | "sub";
   signedUp: boolean;
@@ -26,12 +27,14 @@ export default function AttendanceGrid({
   eventType,
   rows,
   isAdmin,
+  subAlliances,
 }: {
   orgId: string;
   eventId: string;
   eventType: EventType;
   rows: Row[];
   isAdmin: boolean;
+  subAlliances: { id: string; name: string }[];
 }) {
   const showLegion = eventType !== "bear";
   const showPunish = eventType !== "bear";
@@ -39,6 +42,7 @@ export default function AttendanceGrid({
   const showReason = eventType !== "bear";
   const [search, setSearch] = useState("");
   const [legionFilter, setLegionFilter] = useState("all");
+  const [allianceFilter, setAllianceFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
   const [, startTransition] = useTransition();
@@ -53,6 +57,7 @@ export default function AttendanceGrid({
   const filtered = useMemo(() => {
     let list = rows;
     if (legionFilter !== "all") list = list.filter((r) => r.legion === legionFilter);
+    if (allianceFilter !== "all") list = list.filter((r) => r.subAllianceId === allianceFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter((r) => r.name.toLowerCase().includes(q));
@@ -63,7 +68,7 @@ export default function AttendanceGrid({
       if (sortKey === "signedUp") return sortDir * (Number(a.signedUp) - Number(b.signedUp));
       return sortDir * (Number(a.arrived) - Number(b.arrived));
     });
-  }, [rows, legionFilter, search, sortKey, sortDir]);
+  }, [rows, legionFilter, allianceFilter, search, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === 1 ? -1 : 1));
@@ -90,6 +95,20 @@ export default function AttendanceGrid({
             className="w-full rounded-full border border-slate-200 bg-white py-1.5 px-3 text-sm focus:border-teal-500 focus:outline-none"
           />
         </div>
+        {subAlliances.length > 0 && (
+          <select
+            value={allianceFilter}
+            onChange={(e) => setAllianceFilter(e.target.value)}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:border-teal-500 focus:outline-none"
+          >
+            <option value="all">All alliances</option>
+            {subAlliances.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        )}
         {showLegion && (
           <select
             value={legionFilter}

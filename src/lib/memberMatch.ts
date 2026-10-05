@@ -1,4 +1,5 @@
 export type MatchableMember = { id: string; name: string; chiefId: string | null; aliases?: string[];
+  subAllianceId?: string | null;
   power?: number | null;
   level?: number | null;
   rank?: string | null;

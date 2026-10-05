@@ -31,6 +31,12 @@ export default async function EventAttendancePage({
   const isAdmin = membership.isAdmin;
   const label = LABELS[eventType];
 
+  const { data: subAlliances } = await supabase
+    .from("sub_alliances")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .order("name");
+
   const [{ data: events }, { data: members }, { data: punishments }, { data: resolvedPunishments }] =
     await Promise.all([
       supabase
@@ -41,7 +47,7 @@ export default async function EventAttendancePage({
         .order("event_date", { ascending: false }),
       supabase
         .from("members")
-        .select("id, name, chief_id, aliases")
+        .select("id, name, chief_id, aliases, sub_alliance_id")
         .eq("org_id", orgId)
         .eq("status", "current")
         .order("name"),
@@ -400,11 +406,13 @@ export default async function EventAttendancePage({
               eventId={activeEvent?.id ?? ""}
               eventType={eventType}
               eventDate={activeEvent?.event_date ?? new Date().toISOString().slice(0, 10)}
+              subAlliances={subAlliances ?? []}
               members={(members ?? []).map((m) => ({
                 id: m.id,
                 name: m.name,
                 chiefId: m.chief_id,
                 aliases: m.aliases,
+                subAllianceId: m.sub_alliance_id,
               }))}
             />
           </div>
@@ -422,11 +430,13 @@ export default async function EventAttendancePage({
               eventId={activeEvent.id}
               eventType={eventType}
               isAdmin={isAdmin}
+              subAlliances={subAlliances ?? []}
               rows={members.map((m) => {
                 const a = attendanceByMember.get(m.id);
                 return {
                   memberId: m.id,
                   name: m.name,
+                  subAllianceId: m.sub_alliance_id,
                   legion: a?.legion ?? null,
                   lineupRole: (a?.lineup_role as "main" | "sub") ?? "main",
                   signedUp: a?.signed_up ?? false,
