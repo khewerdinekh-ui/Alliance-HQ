@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAll } from "@/lib/fetchAll";
 
 function formatDate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -35,13 +36,17 @@ export async function computeOverallPercents(
   const result = new Map<string, number>();
   if (!eventIds.length) return result;
 
-  const { data: attendance } = await supabase
-    .from("attendance")
-    .select("member_id, status, event_id")
-    .in("event_id", eventIds);
+  const attendance = await fetchAll<{ member_id: string; status: string; event_id: string }>((from, to) =>
+    supabase
+      .from("attendance")
+      .select("member_id, status, event_id")
+      .in("event_id", eventIds)
+      .order("id")
+      .range(from, to)
+  );
 
   const attendedUnitsByMember = new Map<string, Set<string>>();
-  for (const row of attendance ?? []) {
+  for (const row of attendance) {
     if (row.status !== "attended") continue;
     const unit = unitByEventId.get(row.event_id);
     if (!unit) continue;

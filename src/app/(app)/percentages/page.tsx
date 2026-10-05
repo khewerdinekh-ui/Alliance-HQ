@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
 import StatCard from "@/components/StatCard";
+import { fetchAll } from "@/lib/fetchAll";
 import PercentagesTable from "@/components/PercentagesTable";
 import type { AttendanceEntry } from "@/components/AttendanceDetailModal";
 
@@ -36,14 +37,17 @@ export default async function PercentagesPage() {
   ]);
 
   const eventIds = events?.map((e) => e.id) ?? [];
-  const { data: attendance } = eventIds.length
-    ? await supabase
-        .from("attendance")
-        .select("event_id, member_id, status, signed_up")
-        .in("event_id", eventIds)
-    : {
-        data: [] as { event_id: string; member_id: string; status: string; signed_up: boolean }[],
-      };
+  // Paged: three months of attendance is over Supabase's 1,000-row cap.
+  const attendance = eventIds.length
+    ? await fetchAll<{ event_id: string; member_id: string; status: string; signed_up: boolean }>((from, to) =>
+        supabase
+          .from("attendance")
+          .select("event_id, member_id, status, signed_up")
+          .in("event_id", eventIds)
+          .order("id")
+          .range(from, to)
+      )
+    : [];
 
   // Bear runs 4 slots per date, but all 4 count as ONE event: fold every Bear
   // event id on the same date into a single "unit" for both the denominators
