@@ -14,7 +14,7 @@ export default async function ImportPage() {
     supabase.from("sub_alliances").select("id, name").eq("org_id", membership.orgId).order("name"),
     supabase
       .from("members")
-      .select("id, name, chief_id, aliases")
+      .select("id, name, chief_id, aliases, power, level, alliance_rank")
       .eq("org_id", membership.orgId)
       .order("name"),
   ]);
@@ -34,6 +34,9 @@ export default async function ImportPage() {
             name: m.name,
             chiefId: m.chief_id,
             aliases: m.aliases,
+            power: m.power,
+            level: m.level,
+            rank: m.alliance_rank,
           }))}
         />
       </div>

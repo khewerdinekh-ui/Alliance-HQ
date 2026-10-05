@@ -110,6 +110,35 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+// Side-by-side numbers so the admin can confirm two records are the same
+// person before merging (a rename keeps Chief ID, and power/level stay close).
+function MergeCheck({ a, b }: { a?: MatchableMember; b?: MatchableMember }) {
+  if (!a || !b) return null;
+  const fmt = (n?: number | null) => (n == null ? "—" : n.toLocaleString());
+  let verdict: { text: string; cls: string } = { text: "No numbers to compare", cls: "text-slate-500" };
+  if (a.chiefId && b.chiefId) {
+    verdict =
+      a.chiefId === b.chiefId
+        ? { text: "Chief ID matches", cls: "text-green-700" }
+        : { text: "Chief IDs differ — likely different people", cls: "text-red-700 font-semibold" };
+  } else if (a.power && b.power) {
+    const diff = Math.abs(a.power - b.power) / Math.max(a.power, b.power);
+    verdict =
+      diff <= 0.1
+        ? { text: `Power within ${(diff * 100).toFixed(1)}% — looks like the same person`, cls: "text-green-700" }
+        : { text: `Power differs by ${(diff * 100).toFixed(0)}% — double-check`, cls: "text-amber-700 font-semibold" };
+  }
+  const line = (m: MatchableMember) =>
+    `${m.name}: power ${fmt(m.power)} · level ${fmt(m.level)} · ${m.rank ?? "—"} · ID ${m.chiefId ?? "—"}`;
+  return (
+    <div className="basis-full rounded bg-white/70 p-2 text-[11px] leading-relaxed text-slate-600">
+      <div>{line(a)}</div>
+      <div>{line(b)}</div>
+      <div className={verdict.cls}>{verdict.text}</div>
+    </div>
+  );
+}
+
 type ImportResult = {
   newNames: string[];
   updatedNames: string[];
@@ -569,6 +598,12 @@ export default function ImportClient({
                         ✕
                       </button>
                     </div>
+                    {mergeTargets[m.id] && (
+                      <MergeCheck
+                        a={members.find((x) => x.id === m.id)}
+                        b={members.find((x) => x.id === mergeTargets[m.id])}
+                      />
+                    )}
                   </div>
                 ))}
               </div>

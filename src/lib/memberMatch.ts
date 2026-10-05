@@ -1,4 +1,8 @@
-export type MatchableMember = { id: string; name: string; chiefId: string | null; aliases?: string[] };
+export type MatchableMember = { id: string; name: string; chiefId: string | null; aliases?: string[];
+  power?: number | null;
+  level?: number | null;
+  rank?: string | null;
+};
 
 // Strips a leading alliance tag like "[ICY]" or "[ICX] " from an in-game
 // display name, since the roster stores names without it but screenshots/CSV
