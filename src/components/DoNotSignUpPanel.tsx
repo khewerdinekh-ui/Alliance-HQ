@@ -19,7 +19,7 @@ export default function DoNotSignUpPanel({
     memberId: string;
     name: string;
     missedCount: number;
-    lastMissed: string;
+    previousMissed: string | null;
     lastPunishment: { date: string; events: number } | null;
   }[];
 }) {
@@ -52,8 +52,8 @@ export default function DoNotSignUpPanel({
             <div>
               <p className="text-sm font-medium text-slate-900">{m.name}</p>
               <p className="text-xs text-slate-400">
-                No reason given · missed {label} {m.missedCount} time{m.missedCount === 1 ? "" : "s"} · last{" "}
-                {m.lastMissed}
+                No reason given · missed {label} {m.missedCount} time{m.missedCount === 1 ? "" : "s"} ·{" "}
+                {m.previousMissed ? `previously missed ${m.previousMissed}` : "first miss"}
               </p>
               <p className="text-xs text-amber-700">
                 {m.lastPunishment

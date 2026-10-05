@@ -114,7 +114,7 @@ export default async function EventAttendancePage({
           .eq("signed_up", true)
           .eq("events.event_type", eventType);
 
-  const missedByMember = new Map<string, { count: number; last: string }>();
+  const missedByMember = new Map<string, { count: number; last: string; dates: string[] }>();
   for (const row of missedRows ?? []) {
     const ev = row.events as { event_date: string } | { event_date: string }[] | null;
     const date = (Array.isArray(ev) ? ev[0]?.event_date : ev?.event_date) ?? "";
@@ -122,6 +122,7 @@ export default async function EventAttendancePage({
     missedByMember.set(row.member_id, {
       count: (prev?.count ?? 0) + 1,
       last: prev && prev.last > date ? prev.last : date,
+      dates: [...(prev?.dates ?? []), date],
     });
   }
   const missHistory = [...missedByMember.entries()]
@@ -149,7 +150,12 @@ export default async function EventAttendancePage({
       memberId: a.member_id,
       name: memberNameById.get(a.member_id)!,
       missedCount: missedByMember.get(a.member_id)?.count ?? 1,
-      lastMissed: missedByMember.get(a.member_id)?.last ?? mostRecentEvent?.event_date ?? "",
+      // The miss before the one being punished now (this event's own date excluded).
+      previousMissed:
+        (missedByMember.get(a.member_id)?.dates ?? [])
+          .filter((d) => d < (mostRecentEvent?.event_date ?? ""))
+          .sort()
+          .at(-1) ?? null,
       lastPunishment: lastPunishmentByMember.get(a.member_id) ?? null,
     }));
 
