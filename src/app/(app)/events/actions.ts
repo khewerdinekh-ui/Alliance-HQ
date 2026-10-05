@@ -460,8 +460,9 @@ export async function bulkImportAttendance(
         lineup_role: prev?.lineup_role ?? row.lineupRole ?? "main",
         reason: reason || null,
         status: arrived ? "attended" : reason ? "excused" : "no_show",
-        // Scores come from the "turned up" list; keep any score already saved.
-        score: row.score ?? prev?.score ?? null,
+        // Scores only come from the "turned up" list; a participating list
+        // never sets one (and keeps any score already saved).
+        score: options.mode === "arrived" ? (row.score ?? prev?.score ?? null) : (prev?.score ?? null),
       });
       continue;
     }

@@ -217,7 +217,7 @@ export default function ScreenshotImportClient({
                 <tr>
                   <th className="px-2 py-1.5">AI read</th>
                   <th className="px-2 py-1.5">Member</th>
-                  <th className="px-2 py-1.5">Score</th>
+                  {options?.mode !== "participating" && <th className="px-2 py-1.5">Score</th>}
                   {!options?.mode && <th className="px-2 py-1.5">Signed up</th>}
                   {!options?.mode && <th className="px-2 py-1.5">Arrived</th>}
                   {!options?.mode && <th className="px-2 py-1.5">Reason</th>}
@@ -244,16 +244,18 @@ export default function ScreenshotImportClient({
                         ))}
                       </select>
                     </td>
-                    <td className="px-2 py-1">
-                      <input
-                        type="number"
-                        value={r.score ?? ""}
-                        onChange={(e) =>
-                          updateRow(i, { score: e.target.value === "" ? null : Number(e.target.value) })
-                        }
-                        className="w-24 rounded border border-slate-200 px-1.5 py-0.5"
-                      />
-                    </td>
+                    {options?.mode !== "participating" && (
+                      <td className="px-2 py-1">
+                        <input
+                          type="number"
+                          value={r.score ?? ""}
+                          onChange={(e) =>
+                            updateRow(i, { score: e.target.value === "" ? null : Number(e.target.value) })
+                          }
+                          className="w-24 rounded border border-slate-200 px-1.5 py-0.5"
+                        />
+                      </td>
+                    )}
                     {!options?.mode && (
                       <>
                         <td className="px-2 py-1">
