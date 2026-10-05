@@ -357,7 +357,7 @@ export type AttendanceImportRow = {
   arrived?: boolean;
   reason?: string;
   legion?: string;
-  lineupRole?: "main" | "sub";
+  lineupRole?: "main" | "sub" | null;
   score?: number | null;
   memberId?: string | null;
   manualMatch?: boolean;
@@ -463,7 +463,8 @@ export async function bulkImportAttendance(
         member_id: memberId,
         signed_up: true,
         legion: options.legion || prev?.legion || row.legion || null,
-        lineup_role: prev?.lineup_role ?? row.lineupRole ?? "main",
+        // Main/sub read from the list wins; otherwise keep what's saved.
+        lineup_role: row.lineupRole ?? prev?.lineup_role ?? "main",
         reason: reason || null,
         status: arrived ? "attended" : reason ? "excused" : "no_show",
         // Scores only come from the "turned up" list; a participating list
@@ -480,7 +481,7 @@ export async function bulkImportAttendance(
       member_id: memberId,
       signed_up: row.signedUp ?? true,
       legion: options.legion || row.legion || null,
-      lineup_role: row.lineupRole ?? "main",
+      lineup_role: row.lineupRole ?? existingByMember.get(memberId)?.lineup_role ?? "main",
       reason: reason || null,
       status: arrived ? "attended" : reason ? "excused" : "no_show",
       score: row.score ?? existingByMember.get(memberId)?.score ?? null,

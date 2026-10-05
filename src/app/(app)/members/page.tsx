@@ -5,6 +5,7 @@ import { computeOverallPercents } from "@/lib/attendance";
 import StatCard from "@/components/StatCard";
 import MembersTable from "@/components/MembersTable";
 import NameChangesPanel from "@/components/NameChangesPanel";
+import DuplicateMembersPanel from "@/components/DuplicateMembersPanel";
 
 export default async function MembersPage() {
   const membership = await requireMembership();
@@ -18,7 +19,7 @@ export default async function MembersPage() {
     supabase
       .from("members")
       .select(
-        "id, name, chief_id, power, level, alliance_rank, status, sub_alliance_id, aliases, pending_name, sub_alliances(name)"
+        "id, name, chief_id, power, level, alliance_rank, status, sub_alliance_id, aliases, pending_name, created_at, sub_alliances(name)"
       )
       .eq("org_id", orgId)
       .order("name"),
@@ -60,6 +61,33 @@ export default async function MembersPage() {
           accent="amber"
         />
       </div>
+
+      {isAdmin && (
+        <DuplicateMembersPanel
+          groups={(() => {
+            const byName = new Map<string, typeof currentMembers>();
+            for (const m of currentMembers) {
+              const key = m.name.trim().toLowerCase();
+              byName.set(key, [...(byName.get(key) ?? []), m]);
+            }
+            return [...byName.values()]
+              .filter((g) => g.length > 1)
+              .map((g) =>
+                [...g]
+                  .sort((a, b) => a.created_at.localeCompare(b.created_at))
+                  .map((m) => ({
+                    id: m.id,
+                    name: m.name,
+                    chiefId: m.chief_id,
+                    power: m.power,
+                    level: m.level,
+                    rank: m.alliance_rank,
+                    createdAt: m.created_at,
+                  }))
+              );
+          })()}
+        />
+      )}
 
       {isAdmin && (
         <NameChangesPanel

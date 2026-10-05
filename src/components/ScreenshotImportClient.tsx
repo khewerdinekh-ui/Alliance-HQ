@@ -18,6 +18,7 @@ type Row = {
   arrived: boolean;
   reason: string;
   score: number | null;
+  lineupRole: "main" | "sub" | null;
   memberId: string | null;
   guessedMemberId: string | null;
 };
@@ -217,6 +218,7 @@ export default function ScreenshotImportClient({
                 <tr>
                   <th className="px-2 py-1.5">AI read</th>
                   <th className="px-2 py-1.5">Member</th>
+                  <th className="px-2 py-1.5">Main / Sub</th>
                   {options?.mode !== "participating" && <th className="px-2 py-1.5">Score</th>}
                   {!options?.mode && <th className="px-2 py-1.5">Signed up</th>}
                   {!options?.mode && <th className="px-2 py-1.5">Arrived</th>}
@@ -242,6 +244,19 @@ export default function ScreenshotImportClient({
                             {m.name}
                           </option>
                         ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-1">
+                      <select
+                        value={r.lineupRole ?? ""}
+                        onChange={(e) =>
+                          updateRow(i, { lineupRole: (e.target.value || null) as "main" | "sub" | null })
+                        }
+                        className="rounded border border-slate-200 px-1.5 py-0.5"
+                      >
+                        <option value="">Keep current</option>
+                        <option value="main">Main</option>
+                        <option value="sub">Sub</option>
                       </select>
                     </td>
                     {options?.mode !== "participating" && (

@@ -76,6 +76,7 @@ export type ExtractedAttendanceRow = {
   arrived: boolean;
   reason: string;
   score: number | null;
+  lineupRole: "main" | "sub" | null;
 };
 
 const SYSTEM_PROMPT = `You read screenshots (or frames of a screen recording) of a mobile game alliance's event sign-up, attendance or results list.
@@ -87,7 +88,10 @@ Copy each name exactly as displayed, including symbols and decorations — do no
 The score is the number shown for that player's row: read every digit, and return null if any of it is cut
 off or hidden. Skip a row entirely if its name is cut off at the edge of the frame; it will appear whole in
 another frame. The same player will appear in several overlapping frames — return them once.
-Respond with strict JSON only: {"rows": [{"nameOrChiefId": string, "signedUp": boolean, "arrived": boolean, "reason": string, "score": number | null}]}.
+Also extract whether each player is in the main lineup or is a substitute: lineupRole is "main" or "sub"
+(a "Sub"/"Substitute"/"Reserve" label or a separate substitutes section means "sub"; a "Main"/"Starter" label or the
+main section means "main"), or null if the image doesn't say.
+Respond with strict JSON only: {"rows": [{"nameOrChiefId": string, "signedUp": boolean, "arrived": boolean, "reason": string, "score": number | null, "lineupRole": "main" | "sub" | null}]}.
 If arrival status isn't shown, assume arrived=false and signedUp=true for anyone listed.
 Use "" for reason when none is shown. Do not include any text outside the JSON object.`;
 
@@ -106,6 +110,7 @@ export async function extractAttendanceFromImages(
     arrived: Boolean(r.arrived),
     reason: String(r.reason ?? "").trim(),
     score: Number.isFinite(Number(r.score)) && r.score != null ? Number(r.score) : null,
+    lineupRole: r.lineupRole === "sub" ? "sub" : r.lineupRole === "main" ? "main" : null,
   }));
 }
 
