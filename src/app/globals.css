@@ -12,11 +12,23 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* The app UI is designed light-only (white cards, slate text). Following the
+   OS dark mode turned inherited text near-white, so inputs, dropdown options
+   and table text on white backgrounds became almost invisible. */
+:root {
+  color-scheme: light;
+}
+
+input,
+select,
+textarea,
+option {
+  color: #0f172a;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8;
 }
 
 body {
