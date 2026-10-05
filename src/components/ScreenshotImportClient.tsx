@@ -74,6 +74,7 @@ export default function ScreenshotImportClient({
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
     if (!files.length) return;
     setError(null);
     setStatus(null);
@@ -196,13 +197,16 @@ export default function ScreenshotImportClient({
           Upload one or more screenshots of a sign-up/attendance list. An AI model reads the names
           and statuses — always review before importing.
         </p>
-        <input
-          type="file"
-          accept="image/*,video/*"
-          multiple
-          onChange={handleFiles}
-          className="text-sm"
-        />
+        <div className="flex flex-wrap gap-3">
+          <label className="cursor-pointer rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">
+            Photos
+            <input type="file" accept="image/*" multiple onChange={handleFiles} className="hidden" />
+          </label>
+          <label className="cursor-pointer rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">
+            Video
+            <input type="file" accept="video/*" onChange={handleFiles} className="hidden" />
+          </label>
+        </div>
 
         {images.length > 0 && rows.length === 0 && (
           <button
