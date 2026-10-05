@@ -6,6 +6,7 @@ const fr: typeof en = {
   "nav.foundry": "Fonderie",
   "nav.canyon": "Canyon",
   "nav.bear": "Ours",
+  "nav.troops": "Troupes",
   "nav.import": "Importer",
   "nav.admin": "Admin",
   "nav.subscription": "Abonnement",

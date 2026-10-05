@@ -4,6 +4,7 @@ const en = {
   "nav.foundry": "Foundry",
   "nav.canyon": "Canyon",
   "nav.bear": "Bear",
+  "nav.troops": "Troops",
   "nav.import": "Import",
   "nav.admin": "Admin",
   "nav.subscription": "Subscription",

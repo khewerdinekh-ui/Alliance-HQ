@@ -6,6 +6,7 @@ const ar: typeof en = {
   "nav.foundry": "المسبك",
   "nav.canyon": "الوادي",
   "nav.bear": "الدب",
+  "nav.troops": "القوات",
   "nav.import": "استيراد",
   "nav.admin": "الإدارة",
   "nav.subscription": "الاشتراك",

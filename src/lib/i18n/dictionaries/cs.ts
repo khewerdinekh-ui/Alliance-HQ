@@ -6,6 +6,7 @@ const cs: typeof en = {
   "nav.foundry": "Slévárna",
   "nav.canyon": "Kaňon",
   "nav.bear": "Medvěd",
+  "nav.troops": "Jednotky",
   "nav.import": "Import",
   "nav.admin": "Administrace",
   "nav.subscription": "Předplatné",
