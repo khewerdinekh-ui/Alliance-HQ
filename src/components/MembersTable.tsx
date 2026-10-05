@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { deleteMember, updateMemberField } from "@/app/(app)/members/actions";
 import MemberModal, { type EditableMember } from "@/components/MemberModal";
 import StatCard from "@/components/StatCard";
+import ExportTableModal from "@/components/ExportTableModal";
 
 type Member = {
   id: string;
@@ -57,6 +58,7 @@ export default function MembersTable({
   const [allianceFilter, setAllianceFilter] = useState<string>("all");
   const [rankFilter, setRankFilter] = useState<string>("all");
   // Overall attendance % range — blank means no limit on that side.
+  const [exportOpen, setExportOpen] = useState(false);
   const [minPct, setMinPct] = useState("");
   const [maxPct, setMaxPct] = useState("");
   const minVal = minPct.trim() === "" ? null : Number(minPct);
@@ -265,6 +267,13 @@ export default function MembersTable({
           />
         </div>
 
+        <button
+          onClick={() => setExportOpen(true)}
+          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+        >
+          Copy for Discord
+        </button>
+
         {isAdmin && (
           <button
             onClick={() => setModalMember("new")}
@@ -444,6 +453,7 @@ export default function MembersTable({
           onClose={() => setModalMember(null)}
         />
       )}
+      {exportOpen && <ExportTableModal rows={filtered} onClose={() => setExportOpen(false)} />}
     </div>
   );
 }
