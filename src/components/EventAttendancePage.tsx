@@ -129,6 +129,20 @@ export default async function EventAttendancePage({
     .map(([id, v]) => ({ memberId: id, name: memberNameById.get(id)!, ...v }))
     .sort((a, b) => b.count - a.count || b.last.localeCompare(a.last));
 
+  // Most recent punishment (active or resolved) per member for this event type.
+  const { data: allPunishments } = await supabase
+    .from("punishments")
+    .select("member_id, required_events, created_at")
+    .eq("org_id", orgId)
+    .eq("event_type", eventType)
+    .order("created_at", { ascending: false });
+  const lastPunishmentByMember = new Map<string, { date: string; events: number }>();
+  for (const p of allPunishments ?? []) {
+    if (!lastPunishmentByMember.has(p.member_id)) {
+      lastPunishmentByMember.set(p.member_id, { date: p.created_at.slice(0, 10), events: p.required_events });
+    }
+  }
+
   const doNotSignUp = (latestAttendance ?? [])
     .filter((a) => memberNameById.has(a.member_id) && !punishedMemberIds.has(a.member_id))
     .map((a) => ({
@@ -136,6 +150,7 @@ export default async function EventAttendancePage({
       name: memberNameById.get(a.member_id)!,
       missedCount: missedByMember.get(a.member_id)?.count ?? 1,
       lastMissed: missedByMember.get(a.member_id)?.last ?? mostRecentEvent?.event_date ?? "",
+      lastPunishment: lastPunishmentByMember.get(a.member_id) ?? null,
     }));
 
   return (
