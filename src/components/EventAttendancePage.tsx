@@ -10,8 +10,7 @@ import {
 import EventDatePicker from "@/components/EventDatePicker";
 import AttendanceGrid from "@/components/AttendanceGrid";
 import DoNotSignUpPanel from "@/components/DoNotSignUpPanel";
-import AttendanceImportClient from "@/components/AttendanceImportClient";
-import ScreenshotImportClient from "@/components/ScreenshotImportClient";
+import EventImportPanel from "@/components/EventImportPanel";
 
 const LABELS: Record<EventType, string> = {
   foundry: "Foundry",
@@ -317,25 +316,14 @@ export default async function EventAttendancePage({
           )}
         </div>
 
-        {isAdmin && activeEvent && (
+        {isAdmin && (
           <div className="border-b border-slate-100 px-5 py-4">
-            <AttendanceImportClient
-              key={`csv-${activeEvent.id}`}
+            <EventImportPanel
+              key={activeEvent?.id ?? "none"}
               orgId={orgId}
-              eventId={activeEvent.id}
+              eventId={activeEvent?.id ?? ""}
               eventType={eventType}
-              members={(members ?? []).map((m) => ({
-                id: m.id,
-                name: m.name,
-                chiefId: m.chief_id,
-                aliases: m.aliases,
-              }))}
-            />
-            <ScreenshotImportClient
-              key={`ai-${activeEvent.id}`}
-              orgId={orgId}
-              eventId={activeEvent.id}
-              eventType={eventType}
+              eventDate={activeEvent?.event_date ?? new Date().toISOString().slice(0, 10)}
               members={(members ?? []).map((m) => ({
                 id: m.id,
                 name: m.name,

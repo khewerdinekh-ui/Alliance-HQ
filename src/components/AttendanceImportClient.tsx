@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { bulkImportAttendance, type AttendanceImportRow, type EventType } from "@/app/(app)/events/actions";
+import {
+  bulkImportAttendance,
+  type AttendanceImportOptions,
+  type AttendanceImportRow,
+  type EventType,
+} from "@/app/(app)/events/actions";
 import { guessMemberId, type MatchableMember } from "@/lib/memberMatch";
 
 function parseBool(value: string) {
@@ -41,11 +46,13 @@ export default function AttendanceImportClient({
   eventId,
   eventType,
   members,
+  options,
 }: {
   orgId: string;
   eventId: string;
   eventType: EventType;
   members: MatchableMember[];
+  options?: AttendanceImportOptions;
 }) {
   const router = useRouter();
   const [rows, setRows] = useState<Row[]>([]);
@@ -83,11 +90,14 @@ export default function AttendanceImportClient({
       ...r,
       manualMatch: r.memberId !== r.guessedMemberId,
     }));
-    const result = await bulkImportAttendance(orgId, eventId, eventType, payload);
+    const result = await bulkImportAttendance(orgId, eventId, eventType, payload, options);
     setImporting(false);
     if (result.error) {
       setStatus(`Import failed: ${result.error}`);
       return;
+    }
+    if (result.eventId && result.eventId !== eventId) {
+      router.push(`/${eventType}?event=${result.eventId}`);
     }
     setStatus(
       `Imported ${result.imported} row${result.imported === 1 ? "" : "s"}.` +
@@ -116,7 +126,7 @@ export default function AttendanceImportClient({
                 <tr>
                   <th className="px-2 py-1.5">From file</th>
                   <th className="px-2 py-1.5">Member</th>
-                  <th className="px-2 py-1.5">Arrived</th>
+                  {!options?.mode && <th className="px-2 py-1.5">Arrived</th>}
                   <th className="px-2 py-1.5" />
                 </tr>
               </thead>
@@ -140,13 +150,15 @@ export default function AttendanceImportClient({
                         ))}
                       </select>
                     </td>
-                    <td className="px-2 py-1">
-                      <input
-                        type="checkbox"
-                        checked={r.arrived ?? false}
-                        onChange={(e) => updateRow(i, { arrived: e.target.checked })}
-                      />
-                    </td>
+                    {!options?.mode && (
+                      <td className="px-2 py-1">
+                        <input
+                          type="checkbox"
+                          checked={r.arrived ?? false}
+                          onChange={(e) => updateRow(i, { arrived: e.target.checked })}
+                        />
+                      </td>
+                    )}
                     <td className="px-2 py-1">
                       <button onClick={() => removeRow(i)} className="text-red-500">
                         ✕

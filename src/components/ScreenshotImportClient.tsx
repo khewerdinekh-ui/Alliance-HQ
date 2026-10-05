@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   bulkImportAttendance,
   extractAttendanceScreenshot,
+  type AttendanceImportOptions,
   type EventType,
 } from "@/app/(app)/events/actions";
 import { resizeImageDataUrl } from "@/lib/imageResize";
@@ -46,11 +47,13 @@ export default function ScreenshotImportClient({
   eventId,
   eventType,
   members,
+  options,
 }: {
   orgId: string;
   eventId: string;
   eventType: EventType;
   members: MatchableMember[];
+  options?: AttendanceImportOptions;
 }) {
   const router = useRouter();
   const [images, setImages] = useState<string[]>([]);
@@ -118,11 +121,14 @@ export default function ScreenshotImportClient({
       ...r,
       manualMatch: r.memberId !== r.guessedMemberId,
     }));
-    const result = await bulkImportAttendance(orgId, eventId, eventType, payload);
+    const result = await bulkImportAttendance(orgId, eventId, eventType, payload, options);
     setImporting(false);
     if (result.error) {
       setStatus(`Import failed: ${result.error}`);
       return;
+    }
+    if (result.eventId && result.eventId !== eventId) {
+      router.push(`/${eventType}?event=${result.eventId}`);
     }
     setStatus(
       `Imported ${result.imported} row${result.imported === 1 ? "" : "s"}.` +
@@ -170,9 +176,9 @@ export default function ScreenshotImportClient({
                 <tr>
                   <th className="px-2 py-1.5">AI read</th>
                   <th className="px-2 py-1.5">Member</th>
-                  <th className="px-2 py-1.5">Signed up</th>
-                  <th className="px-2 py-1.5">Arrived</th>
-                  <th className="px-2 py-1.5">Reason</th>
+                  {!options?.mode && <th className="px-2 py-1.5">Signed up</th>}
+                  {!options?.mode && <th className="px-2 py-1.5">Arrived</th>}
+                  {!options?.mode && <th className="px-2 py-1.5">Reason</th>}
                   <th className="px-2 py-1.5" />
                 </tr>
               </thead>
@@ -196,27 +202,31 @@ export default function ScreenshotImportClient({
                         ))}
                       </select>
                     </td>
-                    <td className="px-2 py-1">
-                      <input
-                        type="checkbox"
-                        checked={r.signedUp}
-                        onChange={(e) => updateRow(i, { signedUp: e.target.checked })}
-                      />
-                    </td>
-                    <td className="px-2 py-1">
-                      <input
-                        type="checkbox"
-                        checked={r.arrived}
-                        onChange={(e) => updateRow(i, { arrived: e.target.checked })}
-                      />
-                    </td>
-                    <td className="px-2 py-1">
-                      <input
-                        value={r.reason}
-                        onChange={(e) => updateRow(i, { reason: e.target.value })}
-                        className="w-24 rounded border border-slate-200 px-1.5 py-0.5"
-                      />
-                    </td>
+                    {!options?.mode && (
+                      <>
+                        <td className="px-2 py-1">
+                          <input
+                            type="checkbox"
+                            checked={r.signedUp}
+                            onChange={(e) => updateRow(i, { signedUp: e.target.checked })}
+                          />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input
+                            type="checkbox"
+                            checked={r.arrived}
+                            onChange={(e) => updateRow(i, { arrived: e.target.checked })}
+                          />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input
+                            value={r.reason}
+                            onChange={(e) => updateRow(i, { reason: e.target.value })}
+                            className="w-24 rounded border border-slate-200 px-1.5 py-0.5"
+                          />
+                        </td>
+                      </>
+                    )}
                     <td className="px-2 py-1">
                       <button onClick={() => removeRow(i)} className="text-red-500">
                         ✕

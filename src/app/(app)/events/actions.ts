@@ -358,13 +358,60 @@ export type AttendanceImportRow = {
   manualMatch?: boolean;
 };
 
+// Chosen above the importers: which legion the list is for, which event date
+// it belongs to, and whether it lists people who are signed up/participating
+// or people who actually turned up. "participating" never downgrades someone
+// already marked as arrived; "arrived" marks them attended (and signed up).
+export type AttendanceImportOptions = {
+  eventDate?: string;
+  legion?: string;
+  mode?: "participating" | "arrived";
+};
+
 export async function bulkImportAttendance(
   orgId: string,
   eventId: string,
   eventType: EventType,
-  rows: AttendanceImportRow[]
+  rows: AttendanceImportRow[],
+  options: AttendanceImportOptions = {}
 ) {
   const supabase = await createClient();
+
+  // Resolve the target event from the chosen date (creating it if needed).
+  if (options.eventDate) {
+    const { data: found } = await supabase
+      .from("events")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("event_type", eventType)
+      .eq("event_date", options.eventDate)
+      .maybeSingle();
+    if (found) {
+      eventId = found.id;
+    } else {
+      const { data: created, error: createError } = await supabase
+        .from("events")
+        .insert({ org_id: orgId, event_type: eventType, event_date: options.eventDate })
+        .select("id")
+        .single();
+      if (createError || !created) {
+        return {
+          imported: 0,
+          unmatched: rows.length,
+          unmatchedNames: rows.map((r) => r.nameOrChiefId),
+          eventId,
+          error: createError?.message ?? "Couldn't create that event date.",
+        };
+      }
+      eventId = created.id;
+    }
+  }
+
+  const { data: existingAttendance } = await supabase
+    .from("attendance")
+    .select("member_id, legion, lineup_role, signed_up, status, reason")
+    .eq("event_id", eventId);
+  const existingByMember = new Map((existingAttendance ?? []).map((a) => [a.member_id, a]));
 
   const { data: members } = await supabase
     .from("members")
@@ -399,6 +446,22 @@ export async function bulkImportAttendance(
     if (row.manualMatch) {
       nameOverrides.push({ memberId, newName: row.nameOrChiefId.trim() });
     }
+    if (options.mode) {
+      const prev = existingByMember.get(memberId);
+      const arrived = options.mode === "arrived" || prev?.status === "attended";
+      const reason = prev?.reason ?? "";
+      upsertsByMemberId.set(memberId, {
+        org_id: orgId,
+        event_id: eventId,
+        member_id: memberId,
+        signed_up: true,
+        legion: options.legion || prev?.legion || row.legion || null,
+        lineup_role: prev?.lineup_role ?? row.lineupRole ?? "main",
+        reason: reason || null,
+        status: arrived ? "attended" : reason ? "excused" : "no_show",
+      });
+      continue;
+    }
     const arrived = row.arrived ?? false;
     const reason = row.reason?.trim() ?? "";
     upsertsByMemberId.set(memberId, {
@@ -406,7 +469,7 @@ export async function bulkImportAttendance(
       event_id: eventId,
       member_id: memberId,
       signed_up: row.signedUp ?? true,
-      legion: row.legion || null,
+      legion: options.legion || row.legion || null,
       lineup_role: row.lineupRole ?? "main",
       reason: reason || null,
       status: arrived ? "attended" : reason ? "excused" : "no_show",
@@ -418,7 +481,7 @@ export async function bulkImportAttendance(
   if (upserts.length) {
     const { error } = await supabase.from("attendance").upsert(upserts, { onConflict: "event_id,member_id" });
     if (error) {
-      return { imported: 0, unmatched: rows.length, unmatchedNames: rows.map((r) => r.nameOrChiefId), error: error.message };
+      return { imported: 0, unmatched: rows.length, unmatchedNames: rows.map((r) => r.nameOrChiefId), eventId, error: error.message };
     }
   }
   if (nameOverrides.length) {
@@ -427,5 +490,5 @@ export async function bulkImportAttendance(
 
   revalidatePath(`/${eventType}`);
   revalidatePath("/members");
-  return { imported: upserts.length, unmatched: unmatchedNames.length, unmatchedNames };
+  return { imported: upserts.length, unmatched: unmatchedNames.length, unmatchedNames, eventId };
 }
