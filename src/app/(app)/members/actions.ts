@@ -63,6 +63,32 @@ export async function updateMemberField(id: string, field: string, value: string
   revalidatePath("/members");
 }
 
+// Resolves a suggested name change: accept makes the spelling an import read
+// the member's real name (old name kept as an alias); dismiss just clears it.
+export async function resolveNameChange(memberId: string, accept: boolean): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const { data: member } = await supabase
+    .from("members")
+    .select("name, aliases, pending_name")
+    .eq("id", memberId)
+    .single();
+  if (!member) return { error: "Member not found." };
+
+  const update: Record<string, unknown> = { pending_name: null };
+  if (accept && member.pending_name) {
+    const aliases = new Set(member.aliases ?? []);
+    aliases.add(member.name);
+    aliases.delete(member.pending_name);
+    update.name = member.pending_name;
+    update.aliases = [...aliases];
+  }
+
+  const { error } = await supabase.from("members").update(update).eq("id", memberId);
+  if (error) return { error: error.message };
+  revalidatePath("/members");
+  return { error: null };
+}
+
 export async function deleteMember(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");

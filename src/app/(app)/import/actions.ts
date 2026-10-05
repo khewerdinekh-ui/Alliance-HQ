@@ -125,25 +125,26 @@ export async function bulkImportMembers(rows: ImportRow[], subAllianceId?: strin
       // OCR variant, decoration, or a real in-game rename) — adopt it as
       // the current name and keep the old one as an alias, so the same
       // reading matches automatically next time instead of asking again.
-      let newName = existing.name;
       let newAliases = existing.aliases ?? [];
+      let pendingName: string | undefined;
       if (row.manualMatch) {
         const stripped = stripTag(name);
         if (stripped && stripped !== existing.name) {
           const aliases = new Set(existing.aliases ?? []);
-          aliases.add(existing.name);
+          aliases.add(stripped);
           if (name !== stripped) aliases.add(name);
-          aliases.delete(stripped);
-          newName = stripped;
           newAliases = [...aliases];
+          pendingName = stripped;
         }
       }
 
       await supabase
         .from("members")
         .update({
-          name: newName,
+          // The member keeps their name; the reading is saved as an alias and
+          // flagged for an admin to confirm as a real rename on the Members page.
           aliases: newAliases,
+          pending_name: pendingName,
           status: "current",
           sub_alliance_id: rowSubAllianceId ?? existing.sub_alliance_id,
           alliance_rank: rank && RANKS.has(rank) ? rank : undefined,

@@ -4,6 +4,7 @@ import { getTranslations } from "@/lib/i18n/getLocale";
 import { computeOverallPercents } from "@/lib/attendance";
 import StatCard from "@/components/StatCard";
 import MembersTable from "@/components/MembersTable";
+import NameChangesPanel from "@/components/NameChangesPanel";
 
 export default async function MembersPage() {
   const membership = await requireMembership();
@@ -17,7 +18,7 @@ export default async function MembersPage() {
     supabase
       .from("members")
       .select(
-        "id, name, chief_id, power, level, alliance_rank, status, sub_alliance_id, aliases, sub_alliances(name)"
+        "id, name, chief_id, power, level, alliance_rank, status, sub_alliance_id, aliases, pending_name, sub_alliances(name)"
       )
       .eq("org_id", orgId)
       .order("name"),
@@ -59,6 +60,14 @@ export default async function MembersPage() {
           accent="amber"
         />
       </div>
+
+      {isAdmin && (
+        <NameChangesPanel
+          items={(members ?? [])
+            .filter((m) => m.pending_name && m.pending_name !== m.name)
+            .map((m) => ({ id: m.id, name: m.name, pending: m.pending_name as string }))}
+        />
+      )}
 
       <MembersTable
         orgId={orgId}

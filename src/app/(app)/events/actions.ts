@@ -163,14 +163,15 @@ async function applyNameOverrides(
     const newName = stripTag(rawNewName);
     if (!member || !newName || newName === member.name) continue;
 
+    // Keep the member's name; save the reading as an alias so it auto-matches
+    // next time, and flag it for the admin to confirm as a real rename.
     const aliases = new Set(member.aliases);
-    aliases.add(member.name);
+    aliases.add(newName);
     if (rawNewName.trim() !== newName) aliases.add(rawNewName.trim());
-    aliases.delete(newName);
 
     await supabase
       .from("members")
-      .update({ name: newName, aliases: [...aliases] })
+      .update({ aliases: [...aliases], pending_name: newName })
       .eq("id", memberId);
   }
 }
