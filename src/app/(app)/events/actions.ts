@@ -271,8 +271,11 @@ export async function updateAttendanceRow(update: AttendanceFieldUpdate) {
   const signedUp = update.signedUp ?? existing?.signed_up ?? true;
   const reason = update.reason ?? existing?.reason ?? "";
   const score = update.score !== undefined ? update.score : (existing?.score ?? null);
+  // Foundry: 0 points counts as a no-show regardless of the arrived tick.
   const arrived =
-    update.arrived ?? (existing ? existing.status === "attended" : false);
+    update.eventType === "foundry" && score === 0
+      ? false
+      : (update.arrived ?? (existing ? existing.status === "attended" : false));
 
   const status = arrived ? "attended" : reason.trim() ? "excused" : "no_show";
 
@@ -449,7 +452,9 @@ export async function bulkImportAttendance(
     }
     if (options.mode) {
       const prev = existingByMember.get(memberId);
-      const arrived = options.mode === "arrived" || prev?.status === "attended";
+      // Foundry: scoring 0 points means they didn't really turn up.
+      const zeroFoundry = eventType === "foundry" && options.mode === "arrived" && row.score === 0;
+      const arrived = zeroFoundry ? false : options.mode === "arrived" || prev?.status === "attended";
       const reason = prev?.reason ?? "";
       upsertsByMemberId.set(memberId, {
         org_id: orgId,
