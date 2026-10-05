@@ -78,6 +78,8 @@ export async function bulkImportMembers(rows: ImportRow[], subAllianceId?: strin
   const newNames: string[] = [];
   const updatedNames: string[] = [];
   const matchedIds = new Set<string>();
+  const updatesById = new Map<string, Record<string, unknown>>();
+  const inserts: Record<string, unknown>[] = [];
 
   for (const row of rows) {
     const name = row.name?.trim();
@@ -138,39 +140,47 @@ export async function bulkImportMembers(rows: ImportRow[], subAllianceId?: strin
         }
       }
 
-      await supabase
-        .from("members")
-        .update({
-          // The member keeps their name; the reading is saved as an alias and
-          // flagged for an admin to confirm as a real rename on the Members page.
-          aliases: newAliases,
-          pending_name: pendingName,
-          status: "current",
-          sub_alliance_id: rowSubAllianceId ?? existing.sub_alliance_id,
-          alliance_rank: rank && RANKS.has(rank) ? rank : undefined,
-          power: power ?? undefined,
-          level: level ?? undefined,
-          chief_id: row.chiefId?.trim() || existing.chief_id,
-        })
-        .eq("id", matchId);
+      // Queued, not awaited one by one: ~90 sequential round-trips ran past
+      // the host's function time limit and left the page stuck on "Importing…".
+      updatesById.set(matchId, {
+        // The member keeps their name; the reading is saved as an alias and
+        // flagged for an admin to confirm as a real rename on the Members page.
+        aliases: newAliases,
+        pending_name: pendingName,
+        status: "current",
+        sub_alliance_id: rowSubAllianceId ?? existing.sub_alliance_id,
+        alliance_rank: rank && RANKS.has(rank) ? rank : undefined,
+        power: power ?? undefined,
+        level: level ?? undefined,
+        chief_id: row.chiefId?.trim() || existing.chief_id,
+      });
       updatedNames.push(name);
     } else {
-      const { data: created } = await supabase
-        .from("members")
-        .insert({
-          org_id: orgId,
-          name,
-          chief_id: row.chiefId?.trim() || null,
-          sub_alliance_id: rowSubAllianceId,
-          alliance_rank: rank && RANKS.has(rank) ? rank : "R1",
-          power,
-          level,
-        })
-        .select("id")
-        .single();
-      if (created) matchedIds.add(created.id);
+      inserts.push({
+        org_id: orgId,
+        name,
+        chief_id: row.chiefId?.trim() || null,
+        sub_alliance_id: rowSubAllianceId,
+        alliance_rank: rank && RANKS.has(rank) ? rank : "R1",
+        power,
+        level,
+      });
       newNames.push(name);
     }
+  }
+
+  // New members in a single insert; updates in parallel chunks.
+  if (inserts.length) {
+    const { data: created } = await supabase.from("members").insert(inserts).select("id");
+    for (const c of created ?? []) matchedIds.add(c.id);
+  }
+  const updateEntries = [...updatesById.entries()];
+  for (let i = 0; i < updateEntries.length; i += 20) {
+    await Promise.all(
+      updateEntries
+        .slice(i, i + 20)
+        .map(([id, patch]) => supabase.from("members").update(patch).eq("id", id))
+    );
   }
 
   if (newNames.length === 0 && updatedNames.length === 0) {
