@@ -196,6 +196,17 @@ export async function bulkImportMembers(rows: ImportRow[], subAllianceId?: strin
   };
 }
 
+// Merges two records that are the same person: keepId's history stays, and it
+// adopts removeId's (fresher) name/roster data before removeId is deleted.
+export async function mergeMembers(keepId: string, removeId: string): Promise<{ error: string | null }> {
+  await assertAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("merge_members", { p_keep_id: keepId, p_remove_id: removeId });
+  if (error) return { error: error.message };
+  revalidatePath("/members");
+  return { error: null };
+}
+
 export async function markMembersOld(memberIds: string[], leftAt: string | null) {
   await assertAdmin();
   if (!memberIds.length) return;

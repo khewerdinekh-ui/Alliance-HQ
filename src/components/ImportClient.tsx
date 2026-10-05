@@ -6,6 +6,7 @@ import {
   bulkImportMembers,
   extractMembersScreenshot,
   markMembersOld,
+  mergeMembers,
   type ImportRow,
 } from "@/app/(app)/import/actions";
 import { resizeImageDataUrl } from "@/lib/imageResize";
@@ -131,6 +132,7 @@ export default function ImportClient({
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [marking, setMarking] = useState(false);
+  const [mergeTargets, setMergeTargets] = useState<Record<string, string>>({});
   const [leftDate, setLeftDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const selectedAllianceName = subAlliances.find((a) => a.id === subAllianceId)?.name ?? "";
@@ -298,6 +300,24 @@ export default function ImportClient({
     await markMembersOld(ids, leftDate || null);
     setMarking(false);
     setResult((prev) => (prev ? { ...prev, missing: prev.missing.filter((m) => !ids.includes(m.id)) } : prev));
+    router.refresh();
+  }
+
+  function dismissMissing(id: string) {
+    setResult((prev) => (prev ? { ...prev, missing: prev.missing.filter((m) => m.id !== id) } : prev));
+  }
+
+  async function handleMerge(keepId: string) {
+    const removeId = mergeTargets[keepId];
+    if (!removeId) return;
+    setMarking(true);
+    const res = await mergeMembers(keepId, removeId);
+    setMarking(false);
+    if (res.error) {
+      setError(res.error);
+      return;
+    }
+    dismissMissing(keepId);
     router.refresh();
   }
 
@@ -510,15 +530,45 @@ export default function ImportClient({
               </div>
               <div className="mt-2 space-y-1">
                 {result.missing.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between text-xs text-red-700">
+                  <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 text-xs text-red-700">
                     <span>{m.name}</span>
-                    <button
-                      onClick={() => handleMarkOld([m.id])}
-                      disabled={marking}
-                      className="text-red-600 hover:underline disabled:opacity-60"
-                    >
-                      Mark as old
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={mergeTargets[m.id] ?? ""}
+                        onChange={(e) => setMergeTargets((p) => ({ ...p, [m.id]: e.target.value }))}
+                        className="max-w-[10rem] rounded border border-red-200 bg-white px-1.5 py-1 text-xs"
+                      >
+                        <option value="">Same person as…</option>
+                        {members
+                          .filter((o) => o.id !== m.id)
+                          .map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.name}
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        onClick={() => handleMerge(m.id)}
+                        disabled={marking || !mergeTargets[m.id]}
+                        className="text-teal-700 hover:underline disabled:opacity-40"
+                      >
+                        Merge
+                      </button>
+                      <button
+                        onClick={() => handleMarkOld([m.id])}
+                        disabled={marking}
+                        className="text-red-600 hover:underline disabled:opacity-60"
+                      >
+                        Mark as old
+                      </button>
+                      <button
+                        onClick={() => dismissMissing(m.id)}
+                        aria-label="Dismiss"
+                        className="text-red-400 hover:text-red-700"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
