@@ -26,7 +26,7 @@ const STATUSES = ["Unavailable"];
 // "T11(10)" = tier 11, level 10; "N(9)" = no tier yet, level 9.
 const TIERS = ["T12", "T11", "N"];
 const TROOP_OPTIONS = TIERS.flatMap((tier) =>
-  Array.from({ length: 10 }, (_, i) => `${tier}(${10 - i})`)
+  Array.from({ length: 4 }, (_, i) => `${tier}(${10 - i})`)
 );
 
 // T12 red, T11 at level 10 dark green, T11 lower light green, the rest grey —
