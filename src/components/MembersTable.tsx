@@ -93,6 +93,31 @@ export default function MembersTable({
     });
   }, [base, statusFilter, sortKey, sortDir]);
 
+  // Members per alliance under the current status/rank/Chief ID/search
+  // filters (the alliance filter itself is ignored so every alliance shows).
+  const allianceCounts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const counts = new Map<string, number>();
+    for (const m of members) {
+      if (statusFilter !== "all" && m.status !== statusFilter) continue;
+      if (rankFilter !== "all" && m.alliance_rank !== rankFilter) continue;
+      if (chiefIdFilter === "has" && !m.chief_id) continue;
+      if (chiefIdFilter === "missing" && m.chief_id) continue;
+      if (
+        q &&
+        !(
+          m.name.toLowerCase().includes(q) ||
+          (m.chief_id ?? "").includes(q) ||
+          m.aliases.some((a) => a.toLowerCase().includes(q))
+        )
+      )
+        continue;
+      const key = m.allianceName || "";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }, [members, statusFilter, rankFilter, chiefIdFilter, search]);
+
   const stats = {
     total: base.length,
     current: base.filter((m) => m.status === "current").length,
@@ -132,6 +157,27 @@ export default function MembersTable({
         <StatCard label={statLabels.alliances} value={stats.alliances} accent="amber" />
       </div>
 
+      <div className="mb-6 flex flex-wrap gap-2 text-sm">
+        {allianceNames.map((a) => (
+          <button
+            key={a}
+            onClick={() => setAllianceFilter(allianceFilter === a ? "all" : a)}
+            className={`rounded-full border px-3 py-1 transition ${
+              allianceFilter === a
+                ? "border-teal-500 bg-teal-50 text-teal-800"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            {a} <strong>{allianceCounts.get(a) ?? 0}</strong>
+          </button>
+        ))}
+        {(allianceCounts.get("") ?? 0) > 0 && (
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-500">
+            No alliance <strong>{allianceCounts.get("")}</strong>
+          </span>
+        )}
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[180px]">
           <svg
@@ -166,7 +212,7 @@ export default function MembersTable({
           <option value="all">All alliances</option>
           {allianceNames.map((a) => (
             <option key={a} value={a}>
-              {a}
+              {a} ({allianceCounts.get(a) ?? 0})
             </option>
           ))}
         </Select>
