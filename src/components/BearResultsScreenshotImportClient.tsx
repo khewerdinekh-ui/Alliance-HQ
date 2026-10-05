@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { bulkImportBearResults, extractBearResultsScreenshot } from "@/app/(app)/events/actions";
 import { resizeImageDataUrl } from "@/lib/imageResize";
 import { guessMemberId, type MatchableMember } from "@/lib/memberMatch";
+import { collapseRows, duplicateMemberIds } from "@/lib/collapseRows";
 
 type Row = { nameOrChiefId: string; score: number; memberId: string | null; guessedMemberId: string | null };
 
@@ -100,6 +101,8 @@ export default function BearResultsScreenshotImportClient({
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const dupes = duplicateMemberIds(rows);
 
   async function runExtraction(dataUrls: string[]) {
     setExtracting(true);
@@ -119,12 +122,14 @@ export default function BearResultsScreenshotImportClient({
         setError(result.error);
         return;
       }
-      setRows(
+      const collapsed = collapseRows(
         result.rows.map((r) => {
           const guessedMemberId = guessMemberId(r.nameOrChiefId, members);
           return { ...r, memberId: guessedMemberId, guessedMemberId };
         })
       );
+      setRows(collapsed.rows);
+      setNotice(collapsed.notes.length ? collapsed.notes.join(" ") : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed.");
     } finally {
@@ -216,6 +221,15 @@ export default function BearResultsScreenshotImportClient({
         {extracting && <p className="text-xs text-slate-500">Reading…</p>}
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
 
+        {notice && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{notice}</p>}
+        {dupes.size > 0 && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+            Warning: {[...dupes].map((id) => members.find((m) => m.id === id)?.name ?? "A member").join(", ")}{" "}
+            appear{dupes.size === 1 ? "s" : ""} on more than one row (highlighted). A member can only have one
+            result per event — remove or re-match the extra rows to import.
+          </p>
+        )}
+
         {rows.length > 0 && (
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <table className="w-full text-left text-xs">
@@ -229,7 +243,12 @@ export default function BearResultsScreenshotImportClient({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {rows.map((r, i) => (
-                  <tr key={i} className={r.memberId ? "" : "bg-red-50/60"}>
+                  <tr
+                    key={i}
+                    className={
+                      r.memberId && dupes.has(r.memberId) ? "bg-amber-100/70" : r.memberId ? "" : "bg-red-50/60"
+                    }
+                  >
                     <td className="px-2 py-1 text-slate-500">{r.nameOrChiefId}</td>
                     <td className="px-2 py-1">
                       <select
@@ -270,7 +289,7 @@ export default function BearResultsScreenshotImportClient({
               </span>
               <button
                 onClick={handleImport}
-                disabled={importing}
+                disabled={importing || dupes.size > 0}
                 className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-teal-700 disabled:opacity-60"
               >
                 {importing ? "Importing…" : "Import"}

@@ -10,6 +10,7 @@ import {
 } from "@/app/(app)/events/actions";
 import { resizeImageDataUrl } from "@/lib/imageResize";
 import { extractVideoFrames } from "@/lib/videoFrames";
+import { collapseRows, duplicateMemberIds } from "@/lib/collapseRows";
 import { guessMemberId, type MatchableMember } from "@/lib/memberMatch";
 
 type Row = {
@@ -69,6 +70,7 @@ export default function ScreenshotImportClient({
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const dupes = duplicateMemberIds(rows);
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -135,11 +137,14 @@ export default function ScreenshotImportClient({
         seenUnmatchedScore.add(r.score);
         return true;
       });
+      const collapsed = collapseRows(merged);
+      merged = collapsed.rows;
       setRows(merged);
-      const dropped = before - merged.length;
+      const dropped = before - merged.length - collapsed.notes.length;
       const notes = [
         firstError ? `Some batches failed and were skipped: ${firstError}` : "",
-        dropped ? `Merged ${dropped} likely duplicate read${dropped === 1 ? "" : "s"} (same score, name unrecognised).` : "",
+        dropped > 0 ? `Merged ${dropped} likely duplicate read${dropped === 1 ? "" : "s"} (same score, name unrecognised).` : "",
+        ...collapsed.notes,
       ].filter(Boolean);
       if (notes.length) setError(notes.join(" "));
     } catch (err) {
@@ -211,6 +216,14 @@ export default function ScreenshotImportClient({
 
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
 
+        {dupes.size > 0 && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+            Warning: {[...dupes].map((id) => members.find((m) => m.id === id)?.name ?? "A member").join(", ")}{" "}
+            appear{dupes.size === 1 ? "s" : ""} on more than one row (highlighted). A member can only be in an
+            event once — remove or re-match the extra rows to import.
+          </p>
+        )}
+
         {rows.length > 0 && (
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <table className="w-full text-left text-xs">
@@ -228,7 +241,12 @@ export default function ScreenshotImportClient({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {rows.map((r, i) => (
-                  <tr key={i} className={r.memberId ? "" : "bg-red-50/60"}>
+                  <tr
+                    key={i}
+                    className={
+                      r.memberId && dupes.has(r.memberId) ? "bg-amber-100/70" : r.memberId ? "" : "bg-red-50/60"
+                    }
+                  >
                     <td className="px-2 py-1 text-slate-500">{r.nameOrChiefId}</td>
                     <td className="px-2 py-1">
                       <select
@@ -312,7 +330,7 @@ export default function ScreenshotImportClient({
               </span>
               <button
                 onClick={handleImport}
-                disabled={importing}
+                disabled={importing || dupes.size > 0}
                 className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-teal-700 disabled:opacity-60"
               >
                 {importing ? "Importing…" : "Import"}
