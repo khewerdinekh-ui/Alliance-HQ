@@ -24,7 +24,7 @@ const SLOTS = [
 const STATUSES = ["Unavailable"];
 
 // "T11(10)" = tier 11, level 10; "N(9)" = no tier yet, level 9.
-const TIERS = ["N", "T9", "T10", "T11", "T12"];
+const TIERS = ["T12", "T11", "N"];
 const TROOP_OPTIONS = TIERS.flatMap((tier) =>
   Array.from({ length: 10 }, (_, i) => `${tier}(${10 - i})`)
 );
