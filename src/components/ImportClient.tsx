@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   bulkImportMembers,
@@ -90,7 +90,7 @@ function extractVideoFrames(file: File, frameCount = 16, maxDimension = 1000): P
   });
 }
 
-const EXTRACT_TIMEOUT_MS = 120000;
+const EXTRACT_TIMEOUT_MS = 420000;
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
@@ -161,6 +161,9 @@ export default function ImportClient({
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [marking, setMarking] = useState(false);
+  const [thoroughness, setThoroughness] = useState(32);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
   const [mergeTargets, setMergeTargets] = useState<Record<string, string>>({});
   const [leftDate, setLeftDate] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -248,19 +251,32 @@ export default function ImportClient({
         seenPower.add(r.power);
         return true;
       });
-      setRows(
-        withGuesses(
-          deduped.map((r) => ({
-            name: r.name,
-            power: r.power != null ? String(r.power) : "",
-            level: r.level != null ? String(r.level) : "",
-            rank: r.rank ?? "",
-          }))
-        )
+      // Reading again (another video, or the same one at a higher thoroughness)
+      // adds people the earlier read missed instead of replacing the preview —
+      // anyone whose power is already in the preview is skipped.
+      const fresh = withGuesses(
+        deduped.map((r) => ({
+          name: r.name,
+          power: r.power != null ? String(r.power) : "",
+          level: r.level != null ? String(r.level) : "",
+          rank: r.rank ?? "",
+        }))
       );
-      if (firstError) {
-        setError(`Some batches failed and were skipped: ${firstError}`);
+      const prev = rowsRef.current;
+      let addedNote = "";
+      if (prev.length === 0) {
+        setRows(fresh);
+      } else {
+        const havePower = new Set(prev.map((r) => r.power).filter(Boolean));
+        const extra = fresh.filter((r) => !r.power || !havePower.has(r.power));
+        setRows([...prev, ...extra]);
+        addedNote = `Added ${extra.length} more member${extra.length === 1 ? "" : "s"} not already in the preview.`;
       }
+      const notes = [
+        firstError ? `Some batches failed and were skipped: ${firstError}` : "",
+        addedNote,
+      ].filter(Boolean);
+      if (notes.length) setError(notes.join(" "));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed.");
     } finally {
@@ -290,7 +306,7 @@ export default function ImportClient({
     setExtracting(true);
     setError(null);
     try {
-      const frames = await extractVideoFrames(file);
+      const frames = await extractVideoFrames(file, thoroughness);
       await runExtraction(frames);
     } catch (err) {
       setExtracting(false);
@@ -408,7 +424,23 @@ export default function ImportClient({
             Video
             <input type="file" accept="video/*" onChange={handleVideo} className="hidden" />
           </label>
+          <label className="flex items-center gap-2 text-xs text-slate-600">
+            Video thoroughness
+            <select
+              value={thoroughness}
+              onChange={(e) => setThoroughness(Number(e.target.value))}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5"
+            >
+              <option value={16}>Quick (16 frames)</option>
+              <option value={32}>Thorough (32 frames)</option>
+              <option value={48}>Maximum (48 frames, slowest)</option>
+            </select>
+          </label>
         </div>
+        <p className="mt-2 text-[11px] text-slate-500">
+          If the AI misses people, read the video again at a higher setting — it adds anyone not already in
+          the preview.
+        </p>
         {extracting && <p className="mt-2 text-xs text-slate-500">Reading…</p>}
         {error && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
       </div>
