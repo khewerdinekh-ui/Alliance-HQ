@@ -592,10 +592,10 @@ export default function ImportClient({
                       </button>
                       <button
                         onClick={() => dismissMissing(m.id)}
-                        aria-label="Dismiss"
-                        className="text-red-400 hover:text-red-700"
+                        title="They're still in the alliance — just not in this video. Nothing is changed."
+                        className="font-medium text-emerald-700 hover:underline"
                       >
-                        ✕
+                        Still here
                       </button>
                     </div>
                     {mergeTargets[m.id] && (
