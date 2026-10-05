@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { requireMembership } from "@/lib/membership";
 import { getTranslations } from "@/lib/i18n/getLocale";
 import { computeOverallPercents } from "@/lib/attendance";
-import StatCard from "@/components/StatCard";
 import MembersTable from "@/components/MembersTable";
 import NameChangesPanel from "@/components/NameChangesPanel";
 import DuplicateMembersPanel from "@/components/DuplicateMembersPanel";
@@ -27,7 +26,6 @@ export default async function MembersPage() {
   ]);
 
   const currentMembers = members?.filter((m) => m.status === "current") ?? [];
-  const oldMembers = members?.filter((m) => m.status === "old") ?? [];
 
   const tableRows = (members ?? []).map((m) => ({
     id: m.id,
@@ -51,16 +49,7 @@ export default async function MembersPage() {
       <h1 className="mt-1 text-2xl font-semibold text-slate-900">{t("members.title")}</h1>
       <p className="mt-1 text-sm text-slate-500">{t("members.subtitle")}</p>
 
-      <div className="mb-6 mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label={t("members.totalMembers")} value={members?.length ?? 0} accent="teal" />
-        <StatCard label={t("members.current")} value={currentMembers.length} accent="violet" />
-        <StatCard label={t("members.oldMembers")} value={oldMembers.length} accent="slate" />
-        <StatCard
-          label={t("members.alliances")}
-          value={subAlliances?.length ?? 0}
-          accent="amber"
-        />
-      </div>
+      <div className="mt-6" />
 
       {isAdmin && (
         <DuplicateMembersPanel
@@ -102,6 +91,12 @@ export default async function MembersPage() {
         members={tableRows}
         subAlliances={subAlliances ?? []}
         isAdmin={isAdmin}
+        statLabels={{
+          total: t("members.totalMembers"),
+          current: t("members.current"),
+          old: t("members.oldMembers"),
+          alliances: t("members.alliances"),
+        }}
       />
     </>
   );

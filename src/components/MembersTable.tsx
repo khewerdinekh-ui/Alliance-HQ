@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { deleteMember, updateMemberField } from "@/app/(app)/members/actions";
 import MemberModal, { type EditableMember } from "@/components/MemberModal";
+import StatCard from "@/components/StatCard";
 
 type Member = {
   id: string;
@@ -42,11 +43,13 @@ export default function MembersTable({
   members,
   subAlliances,
   isAdmin,
+  statLabels,
 }: {
   orgId: string;
   members: Member[];
   subAlliances: { id: string; name: string }[];
   isAdmin: boolean;
+  statLabels: { total: string; current: string; old: string; alliances: string };
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"current" | "old" | "all">("current");
@@ -60,9 +63,11 @@ export default function MembersTable({
 
   const allianceNames = subAlliances.map((a) => a.name);
 
-  const filtered = useMemo(() => {
+  // Everything except the status filter — the stat cards count from this so
+  // they follow the search/alliance/rank/Chief ID filters, while still
+  // splitting current vs old.
+  const base = useMemo(() => {
     let rows = members;
-    if (statusFilter !== "all") rows = rows.filter((m) => m.status === statusFilter);
     if (allianceFilter !== "all") rows = rows.filter((m) => m.allianceName === allianceFilter);
     if (rankFilter !== "all") rows = rows.filter((m) => m.alliance_rank === rankFilter);
     if (chiefIdFilter === "has") rows = rows.filter((m) => !!m.chief_id);
@@ -76,13 +81,24 @@ export default function MembersTable({
           m.aliases.some((a) => a.toLowerCase().includes(q))
       );
     }
-    const sorted = [...rows].sort((a, b) => {
+    return rows;
+  }, [members, allianceFilter, rankFilter, chiefIdFilter, search]);
+
+  const filtered = useMemo(() => {
+    const rows = statusFilter === "all" ? base : base.filter((m) => m.status === statusFilter);
+    return [...rows].sort((a, b) => {
       if (sortKey === "name") return sortDir * a.name.localeCompare(b.name);
       if (sortKey === "power") return sortDir * ((a.power ?? 0) - (b.power ?? 0));
       return sortDir * (a.overallPct - b.overallPct);
     });
-    return sorted;
-  }, [members, statusFilter, allianceFilter, rankFilter, chiefIdFilter, search, sortKey, sortDir]);
+  }, [base, statusFilter, sortKey, sortDir]);
+
+  const stats = {
+    total: base.length,
+    current: base.filter((m) => m.status === "current").length,
+    old: base.filter((m) => m.status === "old").length,
+    alliances: new Set(base.map((m) => m.allianceName).filter(Boolean)).size,
+  };
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -109,6 +125,13 @@ export default function MembersTable({
 
   return (
     <div>
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <StatCard label={statLabels.total} value={stats.total} accent="teal" />
+        <StatCard label={statLabels.current} value={stats.current} accent="violet" />
+        <StatCard label={statLabels.old} value={stats.old} accent="slate" />
+        <StatCard label={statLabels.alliances} value={stats.alliances} accent="amber" />
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[180px]">
           <svg
