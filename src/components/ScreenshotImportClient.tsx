@@ -24,7 +24,7 @@ type Row = {
 
 // A slow AI extraction that never resolves would leave the UI stuck on
 // "Reading…" forever with no feedback — race it against a timeout instead.
-const EXTRACT_TIMEOUT_MS = 120000;
+const EXTRACT_TIMEOUT_MS = 240000;
 // Frames go to the server a couple at a time, one call after another, so no
 // single call runs past the host's time limit or OpenAI's per-minute cap.
 const BATCH_SIZE = 2;
@@ -76,7 +76,7 @@ export default function ScreenshotImportClient({
     setStatus(null);
     try {
       const perFile = await Promise.all(
-        files.map((f) => (f.type.startsWith("video/") ? extractVideoFrames(f) : resizeImageDataUrl(f).then((u) => [u])))
+        files.map((f) => (f.type.startsWith("video/") ? extractVideoFrames(f, 24) : resizeImageDataUrl(f).then((u) => [u])))
       );
       setImages(perFile.flat());
       setRows([]);
@@ -117,13 +117,30 @@ export default function ScreenshotImportClient({
         if (!prev) byName.set(key, r);
         else if ((r.score ?? -1) > (prev.score ?? -1)) byName.set(key, { ...prev, score: r.score });
       }
-      setRows(
-        [...byName.values()].map((r) => {
-          const guessedMemberId = guessMemberId(r.nameOrChiefId, members);
-          return { ...r, memberId: guessedMemberId, guessedMemberId };
-        })
-      );
-      if (firstError) setError(`Some batches failed and were skipped: ${firstError}`);
+      let merged = [...byName.values()].map((r) => {
+        const guessedMemberId = guessMemberId(r.nameOrChiefId, members);
+        return { ...r, memberId: guessedMemberId, guessedMemberId };
+      });
+      // The same row read differently in different frames ("{wincheo}" vs
+      // "{win|cheo}") comes back as separate names with the same score. An
+      // unmatched row whose score equals another row's is almost certainly
+      // one of those misreads, so drop it (preferring to keep a matched one).
+      const before = merged.length;
+      const keepers = new Set(merged.filter((r) => r.memberId && r.score != null).map((r) => r.score));
+      const seenUnmatchedScore = new Set<number>();
+      merged = merged.filter((r) => {
+        if (r.memberId || r.score == null) return true;
+        if (keepers.has(r.score) || seenUnmatchedScore.has(r.score)) return false;
+        seenUnmatchedScore.add(r.score);
+        return true;
+      });
+      setRows(merged);
+      const dropped = before - merged.length;
+      const notes = [
+        firstError ? `Some batches failed and were skipped: ${firstError}` : "",
+        dropped ? `Merged ${dropped} likely duplicate read${dropped === 1 ? "" : "s"} (same score, name unrecognised).` : "",
+      ].filter(Boolean);
+      if (notes.length) setError(notes.join(" "));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed.");
     } finally {

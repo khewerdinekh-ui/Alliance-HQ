@@ -83,6 +83,10 @@ For every player listed, extract: their name or Chief ID (whichever is shown), w
 whether they arrived/participated, any reason/excuse text shown for an absence, and their score/points
 for the event if a number is shown next to them (digits only, no separators), otherwise null.
 List every player visible across all images exactly once. Do not guess or invent players.
+Copy each name exactly as displayed, including symbols and decorations — do not tidy or translate it.
+The score is the number shown for that player's row: read every digit, and return null if any of it is cut
+off or hidden. Skip a row entirely if its name is cut off at the edge of the frame; it will appear whole in
+another frame. The same player will appear in several overlapping frames — return them once.
 Respond with strict JSON only: {"rows": [{"nameOrChiefId": string, "signedUp": boolean, "arrived": boolean, "reason": string, "score": number | null}]}.
 If arrival status isn't shown, assume arrived=false and signedUp=true for anyone listed.
 Use "" for reason when none is shown. Do not include any text outside the JSON object.`;
