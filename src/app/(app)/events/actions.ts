@@ -454,7 +454,9 @@ export async function bulkImportAttendance(
     if (options.mode) {
       const prev = existingByMember.get(memberId);
       // Foundry: scoring 0 points means they didn't really turn up.
-      const zeroFoundry = eventType === "foundry" && options.mode === "arrived" && row.score === 0;
+      // A blank score on a Foundry results list also means no points.
+      const zeroFoundry =
+        eventType === "foundry" && options.mode === "arrived" && (row.score == null || row.score === 0);
       const arrived = zeroFoundry ? false : options.mode === "arrived" || prev?.status === "attended";
       const reason = prev?.reason ?? "";
       upsertsByMemberId.set(memberId, {
