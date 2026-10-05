@@ -13,6 +13,7 @@ export type EditableMember = {
   status: string;
   sub_alliance_id: string | null;
   aliases: string[];
+  joined_at: string | null;
 };
 
 export default function MemberModal({
@@ -35,6 +36,7 @@ export default function MemberModal({
   const [power, setPower] = useState(member?.power != null ? String(member.power) : "");
   const [level, setLevel] = useState(member?.level != null ? String(member.level) : "");
   const [allianceRank, setAllianceRank] = useState(member?.alliance_rank ?? "R1");
+  const [joinedAt, setJoinedAt] = useState(member?.joined_at ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -51,6 +53,7 @@ export default function MemberModal({
         power,
         level,
         aliases,
+        joinedAt,
       });
       if (result.error) {
         setError(result.error);
@@ -184,6 +187,19 @@ export default function MemberModal({
                 </option>
               ))}
             </select>
+          </Field>
+
+          <Field label="Join date" hint="(optional)">
+            <input
+              type="date"
+              value={joinedAt}
+              onChange={(e) => setJoinedAt(e.target.value)}
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              If they joined in the last 3 months, their percentages count only events from this date.
+              Leave blank for the full 3 months.
+            </p>
           </Field>
 
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}

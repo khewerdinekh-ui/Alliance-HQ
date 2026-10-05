@@ -15,6 +15,9 @@ export type MemberFormInput = {
   power: string;
   level: string;
   aliases: string;
+  // yyyy-mm-dd; blank clears it on an existing member (percentages then use
+  // the full 3-month window) and defaults to today on a new one.
+  joinedAt: string;
 };
 
 export async function saveMember(input: MemberFormInput) {
@@ -32,6 +35,7 @@ export async function saveMember(input: MemberFormInput) {
     power: parsePower(input.power),
     level: parseLevel(input.level),
     aliases: parseAliases(input.aliases),
+    joined_at: input.joinedAt ? input.joinedAt : input.id ? null : undefined,
   };
 
   const { error } = input.id

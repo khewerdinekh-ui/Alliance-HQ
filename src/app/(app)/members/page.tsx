@@ -18,7 +18,7 @@ export default async function MembersPage() {
     supabase
       .from("members")
       .select(
-        "id, name, chief_id, power, level, alliance_rank, status, sub_alliance_id, aliases, pending_name, created_at, sub_alliances(name)"
+        "id, name, chief_id, power, level, alliance_rank, status, sub_alliance_id, aliases, pending_name, created_at, joined_at, sub_alliances(name)"
       )
       .eq("org_id", orgId)
       .order("name"),
@@ -37,6 +37,7 @@ export default async function MembersPage() {
     status: m.status,
     sub_alliance_id: m.sub_alliance_id,
     aliases: m.aliases ?? [],
+    joined_at: m.joined_at as string | null,
     allianceName: (m.sub_alliances as unknown as { name: string } | null)?.name ?? "",
     overallPct: overallPercents.get(m.id) ?? 0,
   }));

@@ -16,6 +16,7 @@ type Member = {
   sub_alliance_id: string | null;
   allianceName: string;
   aliases: string[];
+  joined_at: string | null;
   overallPct: number;
 };
 
@@ -145,6 +146,7 @@ export default function MembersTable({
       status: m.status,
       sub_alliance_id: m.sub_alliance_id,
       aliases: m.aliases,
+      joined_at: m.joined_at,
     };
   }
 
