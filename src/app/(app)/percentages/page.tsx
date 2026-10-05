@@ -22,7 +22,7 @@ export default async function PercentagesPage() {
   const [{ data: members }, { data: subAlliances }, { data: events }] = await Promise.all([
     supabase
       .from("members")
-      .select("id, name, chief_id, alliance_rank, sub_alliances(name)")
+      .select("id, name, chief_id, alliance_rank, joined_at, sub_alliances(name)")
       .eq("org_id", orgId)
       .eq("status", "current")
       .order("name"),
@@ -72,6 +72,30 @@ export default async function PercentagesPage() {
   };
   const totalEvents = eventsByType.foundry + eventsByType.canyon + eventsByType.bear;
 
+  // A member who joined inside the window is measured from their join date:
+  // only events on/after it count, in both their tally and their denominators.
+  const rangeStartStr = formatDate(rangeStart);
+  const startByMember = new Map(
+    (members ?? []).map((m) => [
+      m.id,
+      m.joined_at && m.joined_at > rangeStartStr ? (m.joined_at as string) : rangeStartStr,
+    ])
+  );
+  const countsSinceCache = new Map<string, { foundry: number; canyon: number; bear: number }>();
+  function countsSince(start: string) {
+    let c = countsSinceCache.get(start);
+    if (!c) {
+      const inRange = units.filter((u) => u.eventDate >= start);
+      c = {
+        foundry: inRange.filter((u) => u.type === "foundry").length,
+        canyon: inRange.filter((u) => u.type === "canyon").length,
+        bear: inRange.filter((u) => u.type === "bear").length,
+      };
+      countsSinceCache.set(start, c);
+    }
+    return c;
+  }
+
   // Per member per unit, keep the best status across that unit's slot(s):
   // attended beats excused beats a real (signed-up) no_show beats simply
   // never having signed up at all — so one attended Bear slot marks the
@@ -120,6 +144,7 @@ export default async function PercentagesPage() {
     for (const [unitKey, status] of memberUnits) {
       const info = unitInfo.get(unitKey);
       if (!info) continue;
+      if (info.eventDate < (startByMember.get(memberId) ?? rangeStartStr)) continue;
       const bucket = memberStats[info.type];
       if (status === "attended") bucket.attended += 1;
       else if (status === "excused") bucket.excused += 1;
@@ -151,21 +176,25 @@ export default async function PercentagesPage() {
 
   const tableRows = (members ?? []).map((m) => {
     const s = stats.get(m.id)!;
-    const foundryPct = pct(s.foundry.attended, eventsByType.foundry);
-    const canyonPct = pct(s.canyon.attended, eventsByType.canyon);
-    const bearPct = pct(s.bear.attended, eventsByType.bear);
+    const start = startByMember.get(m.id) ?? rangeStartStr;
+    const own = countsSince(start);
+    const ownTotal = own.foundry + own.canyon + own.bear;
+    const foundryPct = pct(s.foundry.attended, own.foundry);
+    const canyonPct = pct(s.canyon.attended, own.canyon);
+    const bearPct = pct(s.bear.attended, own.bear);
     const totalAttended = s.foundry.attended + s.canyon.attended + s.bear.attended;
-    const overallPct = pct(totalAttended, totalEvents);
+    const overallPct = pct(totalAttended, ownTotal);
     const totalExcused = s.foundry.excused + s.canyon.excused + s.bear.excused;
     const totalNoShow = s.foundry.noShow + s.canyon.noShow + s.bear.noShow;
     const totalNotSignedUp = s.foundry.notSignedUp + s.canyon.notSignedUp + s.bear.notSignedUp;
-    const noShowPct = pct(totalNoShow, totalEvents - totalExcused - totalNotSignedUp);
+    const noShowPct = pct(totalNoShow, ownTotal - totalExcused - totalNotSignedUp);
 
     return {
       id: m.id,
       name: m.name,
       chiefId: m.chief_id,
       allianceRank: m.alliance_rank,
+      sinceDate: start > rangeStartStr ? start : null,
       allianceName: (m.sub_alliances as unknown as { name: string } | null)?.name ?? "",
       foundryPct,
       canyonPct,

@@ -8,6 +8,7 @@ type MemberStats = {
   name: string;
   allianceRank: string;
   allianceName: string;
+  sinceDate: string | null;
   foundryPct: number;
   canyonPct: number;
   bearPct: number;
@@ -138,7 +139,14 @@ export default function PercentagesTable({
           <tbody className="divide-y divide-slate-100">
             {filtered.map((m) => (
               <tr key={m.id} className="hover:bg-slate-50/60">
-                <td className="px-4 py-3 font-medium text-slate-900">{m.name}</td>
+                <td className="px-4 py-3 font-medium text-slate-900">
+                  {m.name}
+                  {m.sinceDate && (
+                    <span className="ml-2 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-normal text-sky-700">
+                      since {m.sinceDate}
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-slate-600">{m.allianceRank}</td>
                 <PctCell
                   value={m.foundryPct}
