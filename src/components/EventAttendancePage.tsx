@@ -101,9 +101,42 @@ export default async function EventAttendancePage({
         .eq("signed_up", true)
     : { data: [] as { member_id: string; status: string }[] };
 
+  // Lifetime no-shows (signed up, didn't arrive, no excuse) for this event
+  // type: how many times and when last — so repeat offenders are obvious.
+  const { data: missedRows } =
+    eventType === "bear"
+      ? { data: [] as { member_id: string; events: unknown }[] }
+      : await supabase
+          .from("attendance")
+          .select("member_id, events!inner(event_date, event_type)")
+          .eq("org_id", orgId)
+          .eq("status", "no_show")
+          .eq("signed_up", true)
+          .eq("events.event_type", eventType);
+
+  const missedByMember = new Map<string, { count: number; last: string }>();
+  for (const row of missedRows ?? []) {
+    const ev = row.events as { event_date: string } | { event_date: string }[] | null;
+    const date = (Array.isArray(ev) ? ev[0]?.event_date : ev?.event_date) ?? "";
+    const prev = missedByMember.get(row.member_id);
+    missedByMember.set(row.member_id, {
+      count: (prev?.count ?? 0) + 1,
+      last: prev && prev.last > date ? prev.last : date,
+    });
+  }
+  const missHistory = [...missedByMember.entries()]
+    .filter(([id]) => memberNameById.has(id))
+    .map(([id, v]) => ({ memberId: id, name: memberNameById.get(id)!, ...v }))
+    .sort((a, b) => b.count - a.count || b.last.localeCompare(a.last));
+
   const doNotSignUp = (latestAttendance ?? [])
     .filter((a) => memberNameById.has(a.member_id) && !punishedMemberIds.has(a.member_id))
-    .map((a) => ({ memberId: a.member_id, name: memberNameById.get(a.member_id)! }));
+    .map((a) => ({
+      memberId: a.member_id,
+      name: memberNameById.get(a.member_id)!,
+      missedCount: missedByMember.get(a.member_id)?.count ?? 1,
+      lastMissed: missedByMember.get(a.member_id)?.last ?? mostRecentEvent?.event_date ?? "",
+    }));
 
   return (
     <>
@@ -148,6 +181,28 @@ export default async function EventAttendancePage({
           eventDate={mostRecentEvent.event_date}
           members={doNotSignUp}
         />
+      )}
+
+      {eventType !== "bear" && missHistory.length > 0 && (
+        <details className="mt-6 overflow-hidden rounded-2xl border border-red-100 bg-white">
+          <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-red-900">
+            {label} no-show history ({missHistory.length})
+            <span className="ml-2 text-xs font-normal text-slate-500">
+              Signed up, didn&apos;t arrive, no reason — most misses first
+            </span>
+          </summary>
+          <div className="divide-y divide-slate-100 border-t border-slate-100">
+            {missHistory.map((m) => (
+              <div key={m.memberId} className="flex items-center justify-between px-5 py-2 text-sm">
+                <span className="font-medium text-slate-900">{m.name}</span>
+                <span className="text-xs text-slate-600">
+                  missed <strong className="text-red-700">{m.count}</strong> time{m.count === 1 ? "" : "s"} · last{" "}
+                  {m.last}
+                </span>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
 
       {eventType !== "bear" && (

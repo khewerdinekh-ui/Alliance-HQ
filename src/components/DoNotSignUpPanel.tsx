@@ -15,7 +15,7 @@ export default function DoNotSignUpPanel({
   eventType: EventType;
   label: string;
   eventDate: string;
-  members: { memberId: string; name: string }[];
+  members: { memberId: string; name: string; missedCount: number; lastMissed: string }[];
 }) {
   const [target, setTarget] = useState<{ memberId: string; name: string } | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -45,7 +45,10 @@ export default function DoNotSignUpPanel({
           >
             <div>
               <p className="text-sm font-medium text-slate-900">{m.name}</p>
-              <p className="text-xs text-slate-400">No reason given</p>
+              <p className="text-xs text-slate-400">
+                No reason given · missed {label} {m.missedCount} time{m.missedCount === 1 ? "" : "s"} · last{" "}
+                {m.lastMissed}
+              </p>
             </div>
             <button
               onClick={() => setTarget(m)}
