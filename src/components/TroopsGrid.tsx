@@ -111,7 +111,8 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
     if (res.error) {
       setRows(before);
       setError(res.error);
-    } else {
+    } else if (res.updatedAt) {
+      // Only troop edits move "Last updated" (slots and status don't).
       setRows((prev) => prev.map((r) => (r.memberId === memberId ? { ...r, updatedAt: res.updatedAt } : r)));
     }
   }
@@ -148,7 +149,7 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
         slot2: r.slot2 ? "✓" : "",
         slot3: r.slot3 ? "✓" : "",
         status: r.status,
-        updated: formatUpdated(r.updatedAt) === "—" ? "" : formatUpdated(r.updatedAt),
+        updated: r.infantry || r.lancers || r.marksmen ? (formatUpdated(r.updatedAt) === "—" ? "" : formatUpdated(r.updatedAt)) : "",
       });
       for (const col of TROOP_COLUMNS) {
         const cell = row.getCell(col.key);
@@ -267,7 +268,15 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
     setRows((prev) =>
       prev.map((r) => {
         const it = items.find((i) => i.memberId === r.memberId);
-        return it ? { ...r, ...it.patch, status: it.patch.status ?? r.status, updatedAt: res.updatedAt } : r;
+        if (!it) return r;
+        const troopsChanged =
+          it.patch.infantry !== undefined || it.patch.lancers !== undefined || it.patch.marksmen !== undefined;
+        return {
+          ...r,
+          ...it.patch,
+          status: it.patch.status ?? r.status,
+          updatedAt: troopsChanged ? res.updatedAt : r.updatedAt,
+        };
       })
     );
     setImportRows([]);
@@ -515,7 +524,9 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
                     )
                   )}
                 </td>
-                <td className="whitespace-nowrap px-2 py-1.5 text-xs text-slate-500">{formatUpdated(r.updatedAt)}</td>
+                <td className="whitespace-nowrap px-2 py-1.5 text-xs text-slate-500">
+                  {r.infantry || r.lancers || r.marksmen ? formatUpdated(r.updatedAt) : "—"}
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (

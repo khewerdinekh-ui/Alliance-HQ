@@ -15,6 +15,12 @@ export type TroopPatch = {
   status?: string;
 };
 
+// "Last updated" tracks troop changes only — ticking a time slot or setting a
+// status doesn't move it.
+function touchesTroops(patch: TroopPatch) {
+  return patch.infantry !== undefined || patch.lancers !== undefined || patch.marksmen !== undefined;
+}
+
 function toFields(patch: TroopPatch) {
   const fields: Record<string, unknown> = {};
   if (patch.infantry !== undefined) fields.infantry = patch.infantry;
@@ -37,12 +43,18 @@ export async function updateTroopRow(
   const membership = await requireMembership();
   if (!membership.isAdmin) return { error: "Only admins can edit troops.", updatedAt: null };
 
-  const updatedAt = new Date().toISOString();
+  const touched = touchesTroops(patch);
+  const updatedAt = touched ? new Date().toISOString() : null;
   const supabase = await createClient();
   const { error } = await supabase
     .from("troops")
     .upsert(
-      { org_id: membership.orgId, member_id: memberId, ...toFields(patch), updated_at: updatedAt },
+      {
+        org_id: membership.orgId,
+        member_id: memberId,
+        ...toFields(patch),
+        ...(updatedAt ? { updated_at: updatedAt } : {}),
+      },
       { onConflict: "member_id" }
     );
   if (error) return { error: error.message, updatedAt: null };
@@ -77,7 +89,12 @@ export async function importTroops(
     const results = await Promise.all(
       items.slice(i, i + 20).map((it) =>
         supabase.from("troops").upsert(
-          { org_id: membership.orgId, member_id: it.memberId, ...toFields(it.patch), updated_at: updatedAt },
+          {
+            org_id: membership.orgId,
+            member_id: it.memberId,
+            ...toFields(it.patch),
+            ...(touchesTroops(it.patch) ? { updated_at: updatedAt } : {}),
+          },
           { onConflict: "member_id" }
         )
       )
