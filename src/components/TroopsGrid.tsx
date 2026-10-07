@@ -82,6 +82,10 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
   const [rows, setRows] = useState(initialRows);
   const [search, setSearch] = useState("");
   const [slotFilter, setSlotFilter] = useState("all");
+  // Troops "need checking" when their last updated date is older than this
+  // many days (members with no troops listed have nothing to check).
+  const [checkFilter, setCheckFilter] = useState<"all" | "needs" | "recent">("all");
+  const [staleDays, setStaleDays] = useState("30");
   const [error, setError] = useState<string | null>(null);
 
   const [importRows, setImportRows] = useState<ImportRow[]>([]);
@@ -91,8 +95,16 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const days = Number(staleDays);
+    const cutoff = Date.now() - (Number.isFinite(days) && days > 0 ? days : 30) * 86400000;
     return rows.filter((r) => {
       if (q && !r.name.toLowerCase().includes(q)) return false;
+      if (checkFilter !== "all") {
+        const hasTroops = !!(r.infantry || r.lancers || r.marksmen);
+        if (!hasTroops) return false;
+        const old = !r.updatedAt || new Date(r.updatedAt).getTime() < cutoff;
+        if (checkFilter === "needs" ? !old : old) return false;
+      }
       if (slotFilter === "unavailable") return r.status === "Unavailable";
       // Purely tick-based: any slot ticked shows up, whatever their status says.
       if (slotFilter === "anyslot") return r.slot1 || r.slot2 || r.slot3;
@@ -103,7 +115,7 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
       }
       return true;
     });
-  }, [rows, search, slotFilter]);
+  }, [rows, search, slotFilter, checkFilter, staleDays]);
 
   async function save(memberId: string, patch: Partial<Row>) {
     const before = rows;
@@ -329,6 +341,28 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
           ))}
           <option value="unavailable">Unavailable</option>
         </select>
+        <select
+          value={checkFilter}
+          onChange={(e) => setCheckFilter(e.target.value as typeof checkFilter)}
+          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
+        >
+          <option value="all">All troops</option>
+          <option value="needs">Troops need checking</option>
+          <option value="recent">Checked recently</option>
+        </select>
+        {checkFilter !== "all" && (
+          <label className="flex items-center gap-1.5 text-sm text-slate-600">
+            older than
+            <input
+              type="number"
+              min={1}
+              value={staleDays}
+              onChange={(e) => setStaleDays(e.target.value)}
+              className="w-16 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm"
+            />
+            days
+          </label>
+        )}
         {isAdmin && (
           <button
             onClick={() => {
