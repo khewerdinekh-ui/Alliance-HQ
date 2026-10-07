@@ -84,7 +84,7 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
   const [slotFilter, setSlotFilter] = useState("all");
   // Troops "need checking" when their last updated date is older than this
   // many days (members with no troops listed have nothing to check).
-  const [checkFilter, setCheckFilter] = useState<"all" | "needs" | "recent">("all");
+  const [checkFilter, setCheckFilter] = useState<"all" | "todo" | "needs" | "recent">("all");
   const [staleDays, setStaleDays] = useState("30");
   const [error, setError] = useState<string | null>(null);
 
@@ -99,7 +99,13 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
     const cutoff = Date.now() - (Number.isFinite(days) && days > 0 ? days : 30) * 86400000;
     return rows.filter((r) => {
       if (q && !r.name.toLowerCase().includes(q)) return false;
-      if (checkFilter !== "all") {
+      if (checkFilter === "todo") {
+        // Still to do today: no troops entered, or not updated/checked today.
+        const hasTroops = !!(r.infantry || r.lancers || r.marksmen);
+        const today = new Date().toDateString();
+        const updatedToday = !!r.updatedAt && new Date(r.updatedAt).toDateString() === today;
+        if (hasTroops && updatedToday) return false;
+      } else if (checkFilter !== "all") {
         const hasTroops = !!(r.infantry || r.lancers || r.marksmen);
         if (!hasTroops) return false;
         const old = !r.updatedAt || new Date(r.updatedAt).getTime() < cutoff;
@@ -347,10 +353,11 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
           className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
         >
           <option value="all">All troops</option>
+          <option value="todo">No troops / not updated today</option>
           <option value="needs">Troops need checking</option>
           <option value="recent">Checked recently</option>
         </select>
-        {checkFilter !== "all" && (
+        {(checkFilter === "needs" || checkFilter === "recent") && (
           <label className="flex items-center gap-1.5 text-sm text-slate-600">
             older than
             <input
