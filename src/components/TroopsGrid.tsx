@@ -93,6 +93,8 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
     return rows.filter((r) => {
       if (q && !r.name.toLowerCase().includes(q)) return false;
       if (slotFilter === "unavailable") return r.status === "Unavailable";
+      if (slotFilter === "anyslot") return r.status !== "Unavailable" && (r.slot1 || r.slot2 || r.slot3);
+      if (slotFilter === "noslot") return !r.slot1 && !r.slot2 && !r.slot3;
       if (slotFilter !== "all") {
         return r.status !== "Unavailable" && r[slotFilter as "slot1" | "slot2" | "slot3"];
       }
@@ -301,6 +303,8 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
           className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
         >
           <option value="all">Everyone</option>
+          <option value="anyslot">Available (any time slot ticked)</option>
+          <option value="noslot">No time slot ticked</option>
           {SLOTS.map((s) => (
             <option key={s.key} value={s.key}>
               Available {s.label}
