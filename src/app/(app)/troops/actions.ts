@@ -63,6 +63,31 @@ export async function updateTroopRow(
   return { error: null, updatedAt };
 }
 
+// "Troops checked": the troops were reviewed and are unchanged, so only the
+// last-updated date moves.
+export async function markTroopsChecked(
+  memberIds: string[]
+): Promise<{ error: string | null; updatedAt: string | null }> {
+  const membership = await requireMembership();
+  if (!membership.isAdmin) return { error: "Only admins can edit troops.", updatedAt: null };
+  if (!memberIds.length) return { error: null, updatedAt: null };
+
+  const updatedAt = new Date().toISOString();
+  const supabase = await createClient();
+  for (let i = 0; i < memberIds.length; i += 200) {
+    const { error } = await supabase.from("troops").upsert(
+      memberIds
+        .slice(i, i + 200)
+        .map((id) => ({ org_id: membership.orgId, member_id: id, updated_at: updatedAt })),
+      { onConflict: "member_id" }
+    );
+    if (error) return { error: error.message, updatedAt: null };
+  }
+
+  revalidatePath("/troops");
+  return { error: null, updatedAt };
+}
+
 export async function extractTroopsScreenshot(
   dataUrls: string[]
 ): Promise<{ rows: ExtractedTroopRow[]; error: string | null }> {

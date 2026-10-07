@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   extractTroopsScreenshot,
   importTroops,
+  markTroopsChecked,
   updateTroopRow,
   type TroopPatch,
 } from "@/app/(app)/troops/actions";
@@ -93,7 +94,8 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
     return rows.filter((r) => {
       if (q && !r.name.toLowerCase().includes(q)) return false;
       if (slotFilter === "unavailable") return r.status === "Unavailable";
-      if (slotFilter === "anyslot") return r.status !== "Unavailable" && (r.slot1 || r.slot2 || r.slot3);
+      // Purely tick-based: any slot ticked shows up, whatever their status says.
+      if (slotFilter === "anyslot") return r.slot1 || r.slot2 || r.slot3;
       if (slotFilter === "allslots") return r.status !== "Unavailable" && r.slot1 && r.slot2 && r.slot3;
       if (slotFilter === "noslot") return !r.slot1 && !r.slot2 && !r.slot3;
       if (slotFilter !== "all") {
@@ -118,6 +120,19 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
       // Only troop edits move "Last updated" (slots and status don't).
       setRows((prev) => prev.map((r) => (r.memberId === memberId ? { ...r, updatedAt: res.updatedAt } : r)));
     }
+  }
+
+  // Troops reviewed and unchanged: only moves the last-updated date.
+  async function checked(memberIds: string[]) {
+    if (!memberIds.length) return;
+    setError(null);
+    const res = await markTroopsChecked(memberIds);
+    if (res.error) {
+      setError(res.error);
+      return;
+    }
+    const set = new Set(memberIds);
+    setRows((prev) => prev.map((r) => (set.has(r.memberId) ? { ...r, updatedAt: res.updatedAt } : r)));
   }
 
   const available = (key: "slot1" | "slot2" | "slot3") =>
@@ -304,7 +319,7 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
           className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
         >
           <option value="all">Everyone</option>
-          <option value="anyslot">Available (any time slot ticked)</option>
+          <option value="anyslot">Available at any time (one or more ticked)</option>
           <option value="allslots">Available all times (all 3 ticked)</option>
           <option value="noslot">No time slot ticked</option>
           {SLOTS.map((s) => (
@@ -314,6 +329,19 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
           ))}
           <option value="unavailable">Unavailable</option>
         </select>
+        {isAdmin && (
+          <button
+            onClick={() => {
+              const ids = filtered.filter((r) => r.infantry || r.lancers || r.marksmen).map((r) => r.memberId);
+              if (ids.length && window.confirm(`Mark troops as checked for ${ids.length} member${ids.length === 1 ? "" : "s"} shown? Their last updated date becomes today.`)) {
+                checked(ids);
+              }
+            }}
+            className="rounded-full border border-emerald-200 bg-white px-4 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+          >
+            ✓ Troops checked (all shown)
+          </button>
+        )}
         <button
           onClick={exportExcel}
           className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -531,7 +559,16 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
                   )}
                 </td>
                 <td className="whitespace-nowrap px-2 py-1.5 text-xs text-slate-500">
-                  {r.infantry || r.lancers || r.marksmen ? formatUpdated(r.updatedAt) : "—"}
+                  <span>{r.infantry || r.lancers || r.marksmen ? formatUpdated(r.updatedAt) : "—"}</span>
+                  {isAdmin && (r.infantry || r.lancers || r.marksmen) && (
+                    <button
+                      onClick={() => checked([r.memberId])}
+                      title="Troops checked — they're the same, so just update the date to today"
+                      className="ml-2 rounded-full border border-emerald-200 px-2 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-50"
+                    >
+                      ✓ Checked
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
