@@ -114,6 +114,63 @@ export async function extractAttendanceFromImages(
   }));
 }
 
+export type ExtractedTroopRow = {
+  name: string;
+  infantry: string | null;
+  lancers: string | null;
+  marksmen: string | null;
+  slot1: boolean | null;
+  slot2: boolean | null;
+  slot3: boolean | null;
+  unavailable: boolean | null;
+};
+
+const TROOPS_SYSTEM_PROMPT = `You read screenshots (or frames of a screen recording) of a mobile game alliance's troop and availability sheet.
+Each row is one player. Columns may include:
+- Infantry, Lancers, Marksmen: a tier label such as "T11(10)", "T12(10)" or "N(9)" (tier T11, T12 or N, then a level in brackets). Blank means no troops listed.
+- Availability time slots "12-14 UTC", "14-16 UTC", "15-17 UTC": each is a ticked or unticked checkbox.
+- A status column that says "Unavailable" for players who can't take part, otherwise blank.
+For every player visible, return their name exactly as displayed and whatever of the above is visible.
+Use null for anything that isn't visible in the image (for example a column that isn't shown), so it isn't overwritten.
+List each player once even if they appear in several overlapping frames. Do not invent players.
+Respond with strict JSON only: {"rows": [{"name": string, "infantry": string | null, "lancers": string | null, "marksmen": string | null, "slot1": boolean | null, "slot2": boolean | null, "slot3": boolean | null, "unavailable": boolean | null}]}.
+slot1 = 12-14 UTC, slot2 = 14-16 UTC, slot3 = 15-17 UTC. Do not include any text outside the JSON object.`;
+
+// "t11 ( 10 )" -> "T11(10)"; anything that isn't tier + level (T12/T11/N, 5-10) is dropped.
+function normaliseTier(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const m = value.trim().toUpperCase().match(/^(T12|T11|N)\s*\(\s*(\d{1,2})\s*\)$/);
+  if (!m) return null;
+  const level = Number(m[2]);
+  return level >= 5 && level <= 10 ? `${m[1]}(${level})` : null;
+}
+
+function boolOrNull(v: unknown): boolean | null {
+  return typeof v === "boolean" ? v : null;
+}
+
+export async function extractTroopsFromImages(dataUrls: string[]): Promise<ExtractedTroopRow[]> {
+  const parsed = (await callVisionExtractor(
+    TROOPS_SYSTEM_PROMPT,
+    "Extract the troop and availability rows from the following image(s).",
+    dataUrls,
+    3000
+  )) as { rows?: Record<string, unknown>[] };
+
+  return (parsed.rows ?? [])
+    .map((r) => ({
+      name: String(r.name ?? "").trim(),
+      infantry: normaliseTier(r.infantry),
+      lancers: normaliseTier(r.lancers),
+      marksmen: normaliseTier(r.marksmen),
+      slot1: boolOrNull(r.slot1),
+      slot2: boolOrNull(r.slot2),
+      slot3: boolOrNull(r.slot3),
+      unavailable: boolOrNull(r.unavailable),
+    }))
+    .filter((r) => r.name);
+}
+
 export type ExtractedBearResultRow = {
   nameOrChiefId: string;
   score: number;

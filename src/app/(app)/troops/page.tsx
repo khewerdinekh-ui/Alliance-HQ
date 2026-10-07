@@ -9,13 +9,13 @@ export default async function TroopsPage() {
   const [{ data: members }, { data: troops }] = await Promise.all([
     supabase
       .from("members")
-      .select("id, name")
+      .select("id, name, aliases")
       .eq("org_id", membership.orgId)
       .eq("status", "current")
       .order("name"),
     supabase
       .from("troops")
-      .select("member_id, infantry, lancers, marksmen, slot_1, slot_2, slot_3, status")
+      .select("member_id, infantry, lancers, marksmen, slot_1, slot_2, slot_3, status, updated_at")
       .eq("org_id", membership.orgId),
   ]);
 
@@ -37,6 +37,8 @@ export default async function TroopsPage() {
             return {
               memberId: m.id,
               name: m.name,
+              aliases: (m.aliases ?? []) as string[],
+              updatedAt: (t?.updated_at as string | undefined) ?? null,
               infantry: t?.infantry ?? "",
               lancers: t?.lancers ?? "",
               marksmen: t?.marksmen ?? "",
