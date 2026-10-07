@@ -6,12 +6,15 @@ import { bulkImportBearResults, extractBearResultsScreenshot } from "@/app/(app)
 import { resizeImageDataUrl } from "@/lib/imageResize";
 import { guessMemberId, type MatchableMember } from "@/lib/memberMatch";
 import { collapseRows, duplicateMemberIds } from "@/lib/collapseRows";
+import { extractVideoFrames } from "@/lib/videoFrames";
 
 type Row = { nameOrChiefId: string; score: number; memberId: string | null; guessedMemberId: string | null };
 
 // A slow AI extraction that never resolves would leave the UI stuck on
 // "Reading…" forever with no feedback — race it against a timeout instead.
-const EXTRACT_TIMEOUT_MS = 75000;
+const EXTRACT_TIMEOUT_MS = 300000;
+const BATCH_SIZE = 2;
+const BATCH_DELAY_MS = 1500;
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
@@ -28,61 +31,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
         reject(e);
       }
     );
-  });
-}
-
-// Grabs a handful of evenly-spaced, downscaled frames from a video file as
-// JPEG data URLs — smaller frames mean a faster upload and a faster vision
-// model response, so the same extraction used for screenshots can read them
-// without "ages" of waiting.
-function extractVideoFrames(file: File, frameCount = 10, maxDimension = 1000): Promise<string[]> {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement("video");
-    video.preload = "auto";
-    video.muted = true;
-    video.src = URL.createObjectURL(file);
-
-    const frames: string[] = [];
-    let index = 0;
-
-    video.onerror = () => reject(new Error("Couldn't read that video file."));
-
-    video.onloadedmetadata = () => {
-      let width = video.videoWidth;
-      let height = video.videoHeight;
-      if (width > maxDimension || height > maxDimension) {
-        const scale = maxDimension / Math.max(width, height);
-        width = Math.round(width * scale);
-        height = Math.round(height * scale);
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("Canvas not supported."));
-        return;
-      }
-
-      const seekNext = () => {
-        if (index >= frameCount) {
-          URL.revokeObjectURL(video.src);
-          resolve(frames);
-          return;
-        }
-        const t = (video.duration * (index + 1)) / (frameCount + 1);
-        video.currentTime = t;
-      };
-
-      video.onseeked = () => {
-        ctx.drawImage(video, 0, 0, width, height);
-        frames.push(canvas.toDataURL("image/jpeg", 0.65));
-        index += 1;
-        seekNext();
-      };
-
-      seekNext();
-    };
   });
 }
 
@@ -109,27 +57,43 @@ export default function BearResultsScreenshotImportClient({
     setError(null);
     setStatus(null);
 
-    const totalBytes = dataUrls.reduce((sum, url) => sum + url.length * 0.75, 0);
-    if (totalBytes > 4.5 * 1024 * 1024) {
-      setExtracting(false);
-      setError("That's too much to send at once — try fewer photos or a shorter video.");
-      return;
+    // Frames go to the server two at a time, one call after another, so no
+    // single call runs past the host's time limit, request size limit or
+    // OpenAI's per-minute cap (one big call with every frame is what made
+    // longer videos fail).
+    const batches: string[][] = [];
+    for (let i = 0; i < dataUrls.length; i += BATCH_SIZE) batches.push(dataUrls.slice(i, i + BATCH_SIZE));
+
+    async function runAll() {
+      const results: Awaited<ReturnType<typeof extractBearResultsScreenshot>>[] = [];
+      for (let i = 0; i < batches.length; i++) {
+        results.push(await extractBearResultsScreenshot(batches[i]));
+        if (i < batches.length - 1) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+      }
+      return results;
     }
 
     try {
-      const result = await withTimeout(extractBearResultsScreenshot(dataUrls), EXTRACT_TIMEOUT_MS);
-      if (result.error) {
-        setError(result.error);
+      const results = await withTimeout(runAll(), EXTRACT_TIMEOUT_MS);
+      const firstError = results.find((r) => r.error)?.error;
+      if (firstError && results.every((r) => r.error)) {
+        setError(firstError);
         return;
       }
       const collapsed = collapseRows(
-        result.rows.map((r) => {
-          const guessedMemberId = guessMemberId(r.nameOrChiefId, members);
-          return { ...r, memberId: guessedMemberId, guessedMemberId };
-        })
+        results
+          .flatMap((r) => r.rows)
+          .map((r) => {
+            const guessedMemberId = guessMemberId(r.nameOrChiefId, members);
+            return { ...r, memberId: guessedMemberId, guessedMemberId };
+          })
       );
       setRows(collapsed.rows);
-      setNotice(collapsed.notes.length ? collapsed.notes.join(" ") : null);
+      const notes = [
+        firstError ? `Some batches failed and were skipped: ${firstError}` : "",
+        ...collapsed.notes,
+      ].filter(Boolean);
+      setNotice(notes.length ? notes.join(" ") : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed.");
     } finally {
@@ -161,7 +125,7 @@ export default function BearResultsScreenshotImportClient({
     setError(null);
     setStatus(null);
     try {
-      const frames = await extractVideoFrames(file);
+      const frames = await extractVideoFrames(file, 24);
       await runExtraction(frames);
     } catch (err) {
       setExtracting(false);
