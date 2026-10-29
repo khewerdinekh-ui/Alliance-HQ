@@ -49,7 +49,7 @@ export default async function PercentagesPage() {
       )
     : [];
 
-  // SvS prep: how often each member made the top 100 across prep imports in
+  // SvS prep: how often each member made the top 200 across prep imports in
   // the window (measured from their join date, like the other percentages).
   const { data: prepEvents } = await supabase
     .from("svs_prep_events")

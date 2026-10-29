@@ -145,7 +145,7 @@ export default function PercentagesTable({
               <Th label="Bear %" k="bearPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="Overall %" k="overallPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="No-show %" k="noShowPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-              <Th label="SvS prep top 100 %" k="svsPrepPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <Th label="SvS prep top 200 %" k="svsPrepPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

@@ -50,9 +50,9 @@ export default async function SvsPrepPage() {
   return (
     <>
       <h2 className="text-xs font-semibold uppercase tracking-wide text-teal-700">SvS prep</h2>
-      <h1 className="mt-1 text-2xl font-semibold text-slate-900">Top 100 prep points.</h1>
+      <h1 className="mt-1 text-2xl font-semibold text-slate-900">Top 200 prep points.</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Import the prep-points leaderboard to record who made the top 100. The Percentages page shows how
+        Import the prep-points leaderboard to record who made the top 200. The Percentages page shows how
         often each member gets in.
       </p>
       <div className="mt-6">

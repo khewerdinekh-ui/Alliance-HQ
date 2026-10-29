@@ -173,7 +173,7 @@ export async function extractTroopsFromImages(dataUrls: string[]): Promise<Extra
 
 export type ExtractedPrepRow = { name: string; rank: number | null; points: number | null };
 
-const PREP_SYSTEM_PROMPT = `You read screenshots (or frames of a screen recording) of a mobile game's SvS preparation points leaderboard (the top 100 players).
+const PREP_SYSTEM_PROMPT = `You read screenshots (or frames of a screen recording) of a mobile game's SvS preparation points leaderboard (the top 200 players).
 Each row has a rank number, the player's name, and their points score.
 For every player visible, extract: rank (the number shown, or null), name (exactly as displayed, including symbols and any alliance tag), and points (digits only, no separators, or null if cut off or not shown).
 Skip a row entirely if its name is cut off at the edge of the frame. The same player appears in several overlapping frames — return each player once. Do not invent players.

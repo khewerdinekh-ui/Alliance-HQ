@@ -58,7 +58,7 @@ export default function SvsPrepClient({
     try {
       const perFile = await Promise.all(
         files.map((f) =>
-          f.type.startsWith("video/") ? extractVideoFrames(f, 36) : resizeImageDataUrl(f).then((u) => [u])
+          f.type.startsWith("video/") ? extractVideoFrames(f, 60) : resizeImageDataUrl(f).then((u) => [u])
         )
       );
       const frames = perFile.flat();
@@ -87,11 +87,11 @@ export default function SvsPrepClient({
       }
 
       // Overlapping frames repeat players; keep one row per name (best rank/points),
-      // then drop anything read below 100th.
+      // then drop anything read below 200th.
       const collapsed = collapseRows(
         results
           .flatMap((r) => r.rows)
-          .filter((r) => r.rank == null || r.rank <= 100)
+          .filter((r) => r.rank == null || r.rank <= 200)
           .map((r) => ({
             nameOrChiefId: r.name,
             rank: r.rank,
@@ -99,7 +99,7 @@ export default function SvsPrepClient({
             memberId: guessMemberId(r.name, members),
           }))
       );
-      const sorted = [...collapsed.rows].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)).slice(0, 100);
+      const sorted = [...collapsed.rows].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)).slice(0, 200);
       setRows(sorted);
       setMsg(
         [
@@ -129,13 +129,13 @@ export default function SvsPrepClient({
       setError(res.error);
       return;
     }
-    setMsg(`Saved ${res.saved} member${res.saved === 1 ? "" : "s"} in the top 100 for ${date}${label ? ` (${label})` : ""}.`);
+    setMsg(`Saved ${res.saved} member${res.saved === 1 ? "" : "s"} in the top 200 for ${date}${label ? ` (${label})` : ""}.`);
     setRows([]);
     router.refresh();
   }
 
   async function remove(id: string) {
-    if (!window.confirm("Delete this prep import? Those top-100 entries stop counting in the percentages.")) return;
+    if (!window.confirm("Delete this prep import? Those top-200 entries stop counting in the percentages.")) return;
     const res = await deletePrepEvent(id);
     if (res.error) setError(res.error);
     else router.refresh();
@@ -276,7 +276,7 @@ export default function SvsPrepClient({
                     {e.date}
                     {e.label ? ` · ${e.label}` : ""}
                     <span className="ml-2 text-xs font-normal text-slate-500">
-                      {e.results.length} alliance member{e.results.length === 1 ? "" : "s"} in the top 100
+                      {e.results.length} alliance member{e.results.length === 1 ? "" : "s"} in the top 200
                     </span>
                   </button>
                   {isAdmin && (
