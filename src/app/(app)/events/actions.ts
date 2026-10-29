@@ -338,6 +338,36 @@ export async function createPunishment(input: {
   revalidatePath(`/${input.eventType}`);
 }
 
+// "Not punished": clears a no-show from the "Don't sign up next time" list
+// without punishing them. The miss still counts in history and percentages.
+export async function dismissNoShowPunishment(eventId: string, memberId: string, eventType: EventType) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("attendance")
+    .update({ punish_dismissed: true })
+    .eq("event_id", eventId)
+    .eq("member_id", memberId);
+  if (error) return { error: error.message };
+  revalidatePath(`/${eventType}`);
+  return { error: null };
+}
+
+// "Was filler": they only filled a spot, so the no-show is forgotten — the row
+// stops counting as signed up, which drops it from no-show history, the
+// no-show % and this list.
+export async function markNoShowAsFiller(eventId: string, memberId: string, eventType: EventType) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("attendance")
+    .update({ signed_up: false })
+    .eq("event_id", eventId)
+    .eq("member_id", memberId);
+  if (error) return { error: error.message };
+  revalidatePath(`/${eventType}`);
+  revalidatePath("/percentages");
+  return { error: null };
+}
+
 export async function resolvePunishment(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");

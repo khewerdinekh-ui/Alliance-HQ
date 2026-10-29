@@ -2,22 +2,29 @@
 
 import { useState } from "react";
 import PunishModal from "@/components/PunishModal";
-import type { EventType } from "@/app/(app)/events/actions";
+import {
+  dismissNoShowPunishment,
+  markNoShowAsFiller,
+  type EventType,
+} from "@/app/(app)/events/actions";
 
 export default function DoNotSignUpPanel({
   orgId,
   eventType,
   label,
   eventDate,
+  eventId,
   members,
 }: {
   orgId: string;
   eventType: EventType;
   label: string;
   eventDate: string;
+  eventId: string;
   members: {
     memberId: string;
     name: string;
+    lineupRole: "main" | "sub";
     missedCount: number;
     previousMissed: string | null;
     lastPunishment: { date: string; events: number } | null;
@@ -25,9 +32,23 @@ export default function DoNotSignUpPanel({
 }) {
   const [target, setTarget] = useState<{ memberId: string; name: string } | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const visible = members.filter((m) => !dismissed.has(m.memberId));
   if (visible.length === 0) return null;
+
+  async function run(memberId: string, action: typeof dismissNoShowPunishment) {
+    setBusy(memberId);
+    setError(null);
+    const res = await action(eventId, memberId, eventType);
+    setBusy(null);
+    if (res.error) {
+      setError(res.error);
+      return;
+    }
+    setDismissed((prev) => new Set(prev).add(memberId));
+  }
 
   return (
     <div className="mt-6 overflow-hidden rounded-2xl border border-red-100 bg-red-50/60">
@@ -43,14 +64,24 @@ export default function DoNotSignUpPanel({
           {visible.length}
         </span>
       </div>
+      {error && <p className="mx-5 mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
       <div className="space-y-2 px-5 pb-5">
         {visible.map((m) => (
           <div
             key={m.memberId}
-            className="flex items-center justify-between rounded-xl border border-red-100 bg-white px-4 py-3"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-100 bg-white px-4 py-3"
           >
             <div>
-              <p className="text-sm font-medium text-slate-900">{m.name}</p>
+              <p className="text-sm font-medium text-slate-900">
+                {m.name}
+                <span
+                  className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    m.lineupRole === "sub" ? "bg-sky-100 text-sky-800" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {m.lineupRole === "sub" ? "Sub" : "Main"}
+                </span>
+              </p>
               <p className="text-xs text-slate-400">
                 No reason given · missed {label} {m.missedCount} time{m.missedCount === 1 ? "" : "s"} ·{" "}
                 {m.previousMissed ? `previously missed ${m.previousMissed}` : "first miss"}
@@ -63,12 +94,30 @@ export default function DoNotSignUpPanel({
                   : "Never punished"}
               </p>
             </div>
-            <button
-              onClick={() => setTarget(m)}
-              className="rounded-full bg-red-700 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-red-800"
-            >
-              Punish
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => run(m.memberId, markNoShowAsFiller)}
+                disabled={busy === m.memberId}
+                title="They only filled a spot — forget this no-show completely"
+                className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                Was filler
+              </button>
+              <button
+                onClick={() => run(m.memberId, dismissNoShowPunishment)}
+                disabled={busy === m.memberId}
+                title="Clear from this list without punishing — the miss still counts in history"
+                className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60"
+              >
+                Not punished
+              </button>
+              <button
+                onClick={() => setTarget(m)}
+                className="rounded-full bg-red-700 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-red-800"
+              >
+                Punish
+              </button>
+            </div>
           </div>
         ))}
       </div>

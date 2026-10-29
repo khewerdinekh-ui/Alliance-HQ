@@ -101,11 +101,11 @@ export default async function EventAttendancePage({
   const { data: latestAttendance } = mostRecentEvent
     ? await supabase
         .from("attendance")
-        .select("member_id, status")
+        .select("member_id, status, lineup_role, punish_dismissed")
         .eq("event_id", mostRecentEvent.id)
         .eq("status", "no_show")
         .eq("signed_up", true)
-    : { data: [] as { member_id: string; status: string }[] };
+    : { data: [] as { member_id: string; status: string; lineup_role: string; punish_dismissed: boolean }[] };
 
   // Lifetime no-shows (signed up, didn't arrive, no excuse) for this event
   // type: how many times and when last — so repeat offenders are obvious.
@@ -151,10 +151,14 @@ export default async function EventAttendancePage({
   }
 
   const doNotSignUp = (latestAttendance ?? [])
-    .filter((a) => memberNameById.has(a.member_id) && !punishedMemberIds.has(a.member_id))
+    .filter(
+      (a) =>
+        memberNameById.has(a.member_id) && !punishedMemberIds.has(a.member_id) && !a.punish_dismissed
+    )
     .map((a) => ({
       memberId: a.member_id,
       name: memberNameById.get(a.member_id)!,
+      lineupRole: (a.lineup_role === "sub" ? "sub" : "main") as "main" | "sub",
       missedCount: missedByMember.get(a.member_id)?.count ?? 1,
       // The miss before the one being punished now (this event's own date excluded).
       previousMissed:
@@ -206,6 +210,7 @@ export default async function EventAttendancePage({
           eventType={eventType}
           label={label}
           eventDate={mostRecentEvent.event_date}
+          eventId={mostRecentEvent.id}
           members={doNotSignUp}
         />
       )}
