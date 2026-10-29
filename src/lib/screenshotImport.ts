@@ -175,7 +175,7 @@ export type ExtractedPrepRow = { name: string; rank: number | null; points: numb
 
 const PREP_SYSTEM_PROMPT = `You read screenshots (or frames of a screen recording) of a mobile game's SvS preparation points leaderboard (the top 200 players).
 Each row has a rank number, the player's name, and their points score.
-For every player visible, extract: rank (the number shown, or null), name (exactly as displayed, including symbols and any alliance tag), and points (digits only, no separators, or null if cut off or not shown).
+For every player visible, extract: rank (the number shown, or null), name (exactly as displayed, but WITHOUT the "# 686" state number or the alliance tag in square brackets such as [ICX] that precede it — just the player's own name), and points (digits only, no separators, or null if cut off or not shown).
 Skip a row entirely if its name is cut off at the edge of the frame. The same player appears in several overlapping frames — return each player once. Do not invent players.
 Respond with strict JSON only: {"rows": [{"rank": number | null, "name": string, "points": number | null}]}. Do not include any text outside the JSON object.`;
 
@@ -188,8 +188,17 @@ export async function extractPrepFromImages(dataUrls: string[]): Promise<Extract
   )) as { rows?: Record<string, unknown>[] };
 
   const num = (v: unknown) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+  // The leaderboard shows "# 686 [ICX]DOS": the state number and alliance tag
+  // aren't part of the player's name, so drop them (the tag is often misread,
+  // e.g. "[|CX]", so any bracketed tag goes).
+  const cleanName = (raw: string) =>
+    raw
+      .replace(/^\s*#\s*\d+\s*/, "")
+      .replace(/^\s*\d{3,4}\s*(?=\[)/, "")
+      .replace(/^\s*\[[^\]]*\]\s*/, "")
+      .trim();
   return (parsed.rows ?? [])
-    .map((r) => ({ name: String(r.name ?? "").trim(), rank: num(r.rank), points: num(r.points) }))
+    .map((r) => ({ name: cleanName(String(r.name ?? "")), rank: num(r.rank), points: num(r.points) }))
     .filter((r) => r.name);
 }
 
