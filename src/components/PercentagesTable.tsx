@@ -143,9 +143,9 @@ export default function PercentagesTable({
               <Th label="Foundry %" k="foundryPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="Canyon %" k="canyonPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="Bear %" k="bearPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <Th label="SvS prep top 200 %" k="svsPrepPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="Overall %" k="overallPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="No-show %" k="noShowPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-              <Th label="SvS prep top 200 %" k="svsPrepPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -193,6 +193,9 @@ export default function PercentagesTable({
                     )
                   }
                 />
+                <td className="px-4 py-3 text-slate-600" title={m.svsPrepSeen}>
+                  {m.svsPrepPct == null ? "—" : `${m.svsPrepPct.toFixed(1)}%`}
+                </td>
                 <PctCell
                   value={m.overallPct}
                   bold
@@ -217,14 +220,11 @@ export default function PercentagesTable({
                     )
                   }
                 />
-                <td className="px-4 py-3 text-slate-600" title={m.svsPrepSeen}>
-                  {m.svsPrepPct == null ? "—" : `${m.svsPrepPct.toFixed(1)}%`}
-                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8}className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                   No members match.
                 </td>
               </tr>

@@ -48,17 +48,46 @@ export async function computeOverallPercents(
   const unitsSince = (start: string) => [...dateByUnit.values()].filter((d) => d >= start).length;
   const eventIds = events?.map((e) => e.id) ?? [];
 
-  const result = new Map<string, number>();
-  if (!eventIds.length) return result;
+  // SvS prep imports count as events too — making the top 200 is "attending",
+  // matching the Percentages page.
+  const { data: prepEvents } = await supabase
+    .from("svs_prep_events")
+    .select("id, event_date")
+    .eq("org_id", orgId)
+    .gte("event_date", rangeStartStr)
+    .lte("event_date", formatDate(rangeEnd));
+  const prepDateById = new Map((prepEvents ?? []).map((e) => [e.id as string, e.event_date as string]));
+  const prepIds = [...prepDateById.keys()];
+  const prepResults = prepIds.length
+    ? await fetchAll<{ event_id: string; member_id: string }>((from, to) =>
+        supabase
+          .from("svs_prep_results")
+          .select("event_id, member_id")
+          .in("event_id", prepIds)
+          .order("id")
+          .range(from, to)
+      )
+    : [];
+  const prepDatesByMember = new Map<string, string[]>();
+  for (const r of prepResults) {
+    const d = prepDateById.get(r.event_id);
+    if (d) prepDatesByMember.set(r.member_id, [...(prepDatesByMember.get(r.member_id) ?? []), d]);
+  }
+  const prepSince = (start: string) => [...prepDateById.values()].filter((d) => d >= start).length;
 
-  const attendance = await fetchAll<{ member_id: string; status: string; event_id: string }>((from, to) =>
-    supabase
-      .from("attendance")
-      .select("member_id, status, event_id")
-      .in("event_id", eventIds)
-      .order("id")
-      .range(from, to)
-  );
+  const result = new Map<string, number>();
+  if (!eventIds.length && !prepIds.length) return result;
+
+  const attendance = eventIds.length
+    ? await fetchAll<{ member_id: string; status: string; event_id: string }>((from, to) =>
+        supabase
+          .from("attendance")
+          .select("member_id, status, event_id")
+          .in("event_id", eventIds)
+          .order("id")
+          .range(from, to)
+      )
+    : [];
 
   const attendedUnitsByMember = new Map<string, Set<string>>();
   for (const row of attendance) {
@@ -71,9 +100,13 @@ export async function computeOverallPercents(
     attendedUnitsByMember.get(row.member_id)!.add(unit);
   }
 
-  for (const [memberId, units] of attendedUnitsByMember) {
-    const total = unitsSince(startByMember.get(memberId) ?? rangeStartStr);
-    result.set(memberId, total > 0 ? Math.round((units.size / total) * 1000) / 10 : 0);
+  const memberIds = new Set([...attendedUnitsByMember.keys(), ...prepDatesByMember.keys()]);
+  for (const memberId of memberIds) {
+    const start = startByMember.get(memberId) ?? rangeStartStr;
+    const attended = attendedUnitsByMember.get(memberId)?.size ?? 0;
+    const prepIn = (prepDatesByMember.get(memberId) ?? []).filter((d) => d >= start).length;
+    const total = unitsSince(start) + prepSince(start);
+    result.set(memberId, total > 0 ? Math.round(((attended + prepIn) / total) * 1000) / 10 : 0);
   }
 
   return result;

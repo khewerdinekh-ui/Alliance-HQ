@@ -214,14 +214,15 @@ export default async function PercentagesPage() {
     const canyonPct = pct(s.canyon.attended, own.canyon);
     const bearPct = pct(s.bear.attended, own.bear);
     const totalAttended = s.foundry.attended + s.canyon.attended + s.bear.attended;
-    const overallPct = pct(totalAttended, ownTotal);
+    // SvS prep imports count as events too: making the top 200 is "attending".
+    const prepTotal = [...prepDateById.values()].filter((d) => d >= start).length;
+    const prepIn = (prepDatesByMember.get(m.id) ?? []).filter((d) => d >= start).length;
+    const overallPct = pct(totalAttended + prepIn, ownTotal + prepTotal);
     const totalExcused = s.foundry.excused + s.canyon.excused + s.bear.excused;
     const totalNoShow = s.foundry.noShow + s.canyon.noShow + s.bear.noShow;
     const totalNotSignedUp = s.foundry.notSignedUp + s.canyon.notSignedUp + s.bear.notSignedUp;
     const noShowPct = pct(totalNoShow, ownTotal - totalExcused - totalNotSignedUp);
 
-    const prepTotal = [...prepDateById.values()].filter((d) => d >= start).length;
-    const prepIn = (prepDatesByMember.get(m.id) ?? []).filter((d) => d >= start).length;
     const svsPrepPct = prepTotal > 0 ? pct(prepIn, prepTotal) : null;
 
     return {
