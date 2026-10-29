@@ -49,6 +49,33 @@ export default async function PercentagesPage() {
       )
     : [];
 
+  // SvS prep: how often each member made the top 100 across prep imports in
+  // the window (measured from their join date, like the other percentages).
+  const { data: prepEvents } = await supabase
+    .from("svs_prep_events")
+    .select("id, event_date")
+    .eq("org_id", orgId)
+    .gte("event_date", formatDate(rangeStart))
+    .lte("event_date", formatDate(rangeEnd));
+  const prepDateById = new Map((prepEvents ?? []).map((e) => [e.id, e.event_date as string]));
+  const prepIds = [...prepDateById.keys()];
+  const prepResults = prepIds.length
+    ? await fetchAll<{ event_id: string; member_id: string }>((from, to) =>
+        supabase
+          .from("svs_prep_results")
+          .select("event_id, member_id")
+          .in("event_id", prepIds)
+          .order("id")
+          .range(from, to)
+      )
+    : [];
+  const prepDatesByMember = new Map<string, string[]>();
+  for (const r of prepResults) {
+    const d = prepDateById.get(r.event_id);
+    if (!d) continue;
+    prepDatesByMember.set(r.member_id, [...(prepDatesByMember.get(r.member_id) ?? []), d]);
+  }
+
   // Bear runs 4 slots per date, but all 4 count as ONE event: fold every Bear
   // event id on the same date into a single "unit" for both the denominators
   // (event counts) and the per-member tally below. Foundry/Canyon events are
@@ -193,7 +220,13 @@ export default async function PercentagesPage() {
     const totalNotSignedUp = s.foundry.notSignedUp + s.canyon.notSignedUp + s.bear.notSignedUp;
     const noShowPct = pct(totalNoShow, ownTotal - totalExcused - totalNotSignedUp);
 
+    const prepTotal = [...prepDateById.values()].filter((d) => d >= start).length;
+    const prepIn = (prepDatesByMember.get(m.id) ?? []).filter((d) => d >= start).length;
+    const svsPrepPct = prepTotal > 0 ? pct(prepIn, prepTotal) : null;
+
     return {
+      svsPrepPct,
+      svsPrepSeen: prepTotal > 0 ? `${prepIn} of ${prepTotal} prep imports` : "",
       id: m.id,
       name: m.name,
       chiefId: m.chief_id,

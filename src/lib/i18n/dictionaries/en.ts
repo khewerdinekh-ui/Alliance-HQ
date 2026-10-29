@@ -5,6 +5,7 @@ const en = {
   "nav.canyon": "Canyon",
   "nav.bear": "Bear",
   "nav.troops": "Troops",
+  "nav.svsPrep": "SvS Prep",
   "nav.import": "Import",
   "nav.admin": "Admin",
   "nav.subscription": "Subscription",

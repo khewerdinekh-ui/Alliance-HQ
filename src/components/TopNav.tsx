@@ -16,6 +16,7 @@ const LINKS: { href: string; key: Parameters<ReturnType<typeof useTranslations>[
   { href: "/canyon", key: "nav.canyon" },
   { href: "/bear", key: "nav.bear" },
   { href: "/troops", key: "nav.troops" },
+  { href: "/svs-prep", key: "nav.svsPrep" },
   { href: "/import", key: "nav.import" },
   { href: "/subscription", key: "nav.subscription" },
   { href: "/contact", key: "nav.contact" },

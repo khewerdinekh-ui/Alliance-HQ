@@ -7,6 +7,7 @@ const pl: typeof en = {
   "nav.canyon": "Kanion",
   "nav.bear": "Niedźwiedź",
   "nav.troops": "Wojska",
+  "nav.svsPrep": "SvS Prep",
   "nav.import": "Import",
   "nav.admin": "Admin",
   "nav.subscription": "Subskrypcja",

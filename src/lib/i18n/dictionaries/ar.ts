@@ -7,6 +7,7 @@ const ar: typeof en = {
   "nav.canyon": "الوادي",
   "nav.bear": "الدب",
   "nav.troops": "القوات",
+  "nav.svsPrep": "SvS Prep",
   "nav.import": "استيراد",
   "nav.admin": "الإدارة",
   "nav.subscription": "الاشتراك",

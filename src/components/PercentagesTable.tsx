@@ -14,11 +14,21 @@ type MemberStats = {
   bearPct: number;
   overallPct: number;
   noShowPct: number;
+  svsPrepPct: number | null;
+  svsPrepSeen: string;
   chiefId: string | null;
   events: AttendanceEntry[];
 };
 
-type SortKey = "name" | "rank" | "foundryPct" | "canyonPct" | "bearPct" | "overallPct" | "noShowPct";
+type SortKey =
+  | "name"
+  | "rank"
+  | "foundryPct"
+  | "canyonPct"
+  | "bearPct"
+  | "overallPct"
+  | "noShowPct"
+  | "svsPrepPct";
 
 export default function PercentagesTable({
   members,
@@ -51,6 +61,7 @@ export default function PercentagesTable({
     return [...rows].sort((a, b) => {
       if (sortKey === "name") return sortDir * a.name.localeCompare(b.name);
       if (sortKey === "rank") return sortDir * a.allianceRank.localeCompare(b.allianceRank);
+      if (sortKey === "svsPrepPct") return sortDir * ((a.svsPrepPct ?? -1) - (b.svsPrepPct ?? -1));
       return sortDir * (a[sortKey] - b[sortKey]);
     });
   }, [members, rankFilter, allianceFilter, search, sortKey, sortDir]);
@@ -134,6 +145,7 @@ export default function PercentagesTable({
               <Th label="Bear %" k="bearPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="Overall %" k="overallPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <Th label="No-show %" k="noShowPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <Th label="SvS prep top 100 %" k="svsPrepPct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -205,11 +217,14 @@ export default function PercentagesTable({
                     )
                   }
                 />
+                <td className="px-4 py-3 text-slate-600" title={m.svsPrepSeen}>
+                  {m.svsPrepPct == null ? "—" : `${m.svsPrepPct.toFixed(1)}%`}
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={8}className="px-4 py-8 text-center text-slate-400">
                   No members match.
                 </td>
               </tr>

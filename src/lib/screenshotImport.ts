@@ -171,6 +171,28 @@ export async function extractTroopsFromImages(dataUrls: string[]): Promise<Extra
     .filter((r) => r.name);
 }
 
+export type ExtractedPrepRow = { name: string; rank: number | null; points: number | null };
+
+const PREP_SYSTEM_PROMPT = `You read screenshots (or frames of a screen recording) of a mobile game's SvS preparation points leaderboard (the top 100 players).
+Each row has a rank number, the player's name, and their points score.
+For every player visible, extract: rank (the number shown, or null), name (exactly as displayed, including symbols and any alliance tag), and points (digits only, no separators, or null if cut off or not shown).
+Skip a row entirely if its name is cut off at the edge of the frame. The same player appears in several overlapping frames — return each player once. Do not invent players.
+Respond with strict JSON only: {"rows": [{"rank": number | null, "name": string, "points": number | null}]}. Do not include any text outside the JSON object.`;
+
+export async function extractPrepFromImages(dataUrls: string[]): Promise<ExtractedPrepRow[]> {
+  const parsed = (await callVisionExtractor(
+    PREP_SYSTEM_PROMPT,
+    "Extract the leaderboard rows from the following image(s).",
+    dataUrls,
+    3000
+  )) as { rows?: Record<string, unknown>[] };
+
+  const num = (v: unknown) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+  return (parsed.rows ?? [])
+    .map((r) => ({ name: String(r.name ?? "").trim(), rank: num(r.rank), points: num(r.points) }))
+    .filter((r) => r.name);
+}
+
 export type ExtractedBearResultRow = {
   nameOrChiefId: string;
   score: number;
