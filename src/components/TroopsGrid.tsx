@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   extractTroopsScreenshot,
+  clearAvailability,
   importTroops,
   markTroopsChecked,
   updateTroopRow,
@@ -151,6 +152,29 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
     }
     const set = new Set(memberIds);
     setRows((prev) => prev.map((r) => (set.has(r.memberId) ? { ...r, updatedAt: res.updatedAt } : r)));
+  }
+
+  // Fresh round of availability: untick every slot and clear the status for
+  // the members shown (troop tiers and last-updated stay as they are).
+  async function clearAll() {
+    const ids = filtered.map((r) => r.memberId);
+    if (!ids.length) return;
+    if (
+      !window.confirm(
+        `Clear all time slots and statuses for ${ids.length} member${ids.length === 1 ? "" : "s"} shown? Troops and last updated dates are not changed. This can't be undone.`
+      )
+    )
+      return;
+    setError(null);
+    const res = await clearAvailability(ids);
+    if (res.error) {
+      setError(res.error);
+      return;
+    }
+    const set = new Set(ids);
+    setRows((prev) =>
+      prev.map((r) => (set.has(r.memberId) ? { ...r, slot1: false, slot2: false, slot3: false, status: "" } : r))
+    );
   }
 
   const available = (key: "slot1" | "slot2" | "slot3") =>
@@ -381,6 +405,14 @@ export default function TroopsGrid({ rows: initialRows, isAdmin }: { rows: Row[]
             className="rounded-full border border-emerald-200 bg-white px-4 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
           >
             ✓ Troops checked (all shown)
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={clearAll}
+            className="rounded-full border border-red-200 bg-white px-4 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+          >
+            Clear availability
           </button>
         )}
         <button

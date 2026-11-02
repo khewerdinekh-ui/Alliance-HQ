@@ -88,6 +88,27 @@ export async function markTroopsChecked(
   return { error: null, updatedAt };
 }
 
+// Wipes the time slots and status for a fresh round of availability. Troop
+// tiers and "Last updated" are left alone.
+export async function clearAvailability(memberIds: string[]): Promise<{ error: string | null }> {
+  const membership = await requireMembership();
+  if (!membership.isAdmin) return { error: "Only admins can edit troops." };
+  if (!memberIds.length) return { error: null };
+
+  const supabase = await createClient();
+  for (let i = 0; i < memberIds.length; i += 100) {
+    const { error } = await supabase
+      .from("troops")
+      .update({ slot_1: false, slot_2: false, slot_3: false, status: "" })
+      .eq("org_id", membership.orgId)
+      .in("member_id", memberIds.slice(i, i + 100));
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath("/troops");
+  return { error: null };
+}
+
 export async function extractTroopsScreenshot(
   dataUrls: string[]
 ): Promise<{ rows: ExtractedTroopRow[]; error: string | null }> {
